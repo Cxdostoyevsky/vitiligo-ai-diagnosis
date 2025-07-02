@@ -1,0 +1,2 @@
+# 这个文件确保model文件夹会被Git追踪
+# 请将你的PyTorch模型文件命名为 best_model.pth 并放在这个目录下 
