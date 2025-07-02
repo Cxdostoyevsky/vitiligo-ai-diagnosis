@@ -12,7 +12,7 @@ pip install -r requirements.txt
 
 ### 2. 放置模型文件
 
-将你训练好的PyTorch模型文件放到 `model/best_model.pth`
+将训练好的PyTorch模型文件放到 `model/best_model.pth`
 
 > 如果没有模型文件，系统将使用模拟数据运行，你仍然可以测试界面功能
 
