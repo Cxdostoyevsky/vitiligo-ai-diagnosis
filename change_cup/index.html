@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>“肤”见未来 - AI诊断系统原型</title>
+    <style>
+        /* --- 全局与布局样式 --- */
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
+
+        :root {
+            --primary-color: #007BFF;
+            --primary-hover: #0056b3;
+            --border-color: #dee2e6;
+            --bg-color: #f8f9fa;
+            --text-color: #333;
+            --card-bg: #ffffff;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+        }
+
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .main-container {
+            width: 100%;
+            max-width: 1200px;
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            padding: 2rem;
+            box-sizing: border-box;
+        }
+
+        header h1 {
+            text-align: center;
+            color: var(--primary-color);
+            margin-top: 0;
+            margin-bottom: 2rem;
+            font-weight: 700;
+        }
+
+        .content-wrapper {
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
+
+        /* --- 输入端样式 --- */
+        .input-section, .output-section {
+            flex: 1;
+            min-width: 300px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+        }
+        
+        .input-section h2, .output-section h2 {
+            margin-top: 0;
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 0.5rem;
+            margin-bottom: 1.5rem;
+            font-size: 1.25rem;
+        }
+
+        .upload-area {
+            display: flex;
+            justify-content: space-around;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .upload-box {
+            flex: 1;
+            height: 250px;
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            background-color: #fdfdfd;
+        }
+
+        .upload-box:hover {
+            border-color: var(--primary-color);
+            background-color: #f0f8ff;
+        }
+
+        .upload-box img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: cover;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .upload-prompt {
+            text-align: center;
+        }
+        
+        .upload-prompt p {
+            margin: 0.5rem 0 0;
+            font-weight: 500;
+        }
+        
+        .upload-prompt span {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+
+        .file-name {
+            font-size: 0.8rem;
+            color: #6c757d;
+            margin-top: 0.5rem;
+            text-align: center;
+            word-break: break-all;
+        }
+
+        .action-button {
+            display: block;
+            width: 100%;
+            padding: 0.8rem 1rem;
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: #fff;
+            background-color: var(--primary-color);
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .action-button:hover:not(:disabled) {
+            background-color: var(--primary-hover);
+        }
+        
+        .action-button:disabled {
+            background-color: #a0cfff;
+            cursor: not-allowed;
+        }
+
+        /* --- 输出端样式 --- */
+        .output-section {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 400px;
+        }
+
+        #result-container {
+            width: 100%;
+            text-align: center;
+        }
+        
+        .result-placeholder {
+            color: #6c757d;
+        }
+
+        .result-title {
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .result-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .result-btn {
+            padding: 0.6rem 2rem;
+            border-radius: 20px;
+            border: 2px solid var(--border-color);
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .result-btn.active {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            color: #fff;
+            box-shadow: 0 2px 6px rgba(0, 123, 255, 0.4);
+        }
+
+        .confidence {
+            margin-bottom: 1.5rem;
+        }
+        
+        .confidence-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--success-color);
+        }
+
+        #toggle-details {
+            color: var(--primary-color);
+            cursor: pointer;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        #toggle-details:hover {
+            text-decoration: underline;
+        }
+
+        /* --- 详细过程视图 --- */
+        #details-view {
+            width: 100%;
+            margin-top: 1.5rem;
+            border-top: 1px solid var(--border-color);
+            padding-top: 1.5rem;
+        }
+
+        #details-view h3 {
+            margin-top: 0;
+            text-align: left;
+        }
+
+        .details-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .details-list li {
+            background-color: var(--bg-color);
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+        
+        .details-list .prompt {
+            color: #495057;
+        }
+        
+        .details-list .answer {
+            font-weight: 700;
+            color: var(--primary-hover);
+        }
+
+        /* --- 加载动画 --- */
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid var(--primary-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+
+    </style>
+</head>
+<body>
+
+    <main class="main-container">
+        <header>
+            <h1>“肤”见未来 - 白癜风分期AI诊断系统</h1>
+        </header>
+
+        <div class="content-wrapper">
+            <section class="input-section">
+                <h2>输入端</h2>
+                <div class="upload-area">  
+                    <div class="upload-box" id="upload-box-1" onclick="document.getElementById('file-input-1').click()">
+                        <div class="upload-prompt" id="prompt-1">
+                             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: #adb5bd;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                            <p>临床皮损照片</p>
+                            <span>点击或拖拽上传</span>
+                        </div>
+                        <img id="preview-1" class="hidden" alt="临床皮损照片预览">
+                        <input type="file" id="file-input-1" class="hidden" accept="image/*">
+                    </div>
+                    <div class="upload-box" id="upload-box-2" onclick="document.getElementById('file-input-2').click()">
+                        <div class="upload-prompt" id="prompt-2">
+                             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: #adb5bd;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                            <p>伍德灯照片</p>
+                            <span>点击或拖拽上传</span>
+                        </div>
+                        <img id="preview-2" class="hidden" alt="伍德灯照片预览">
+                        <input type="file" id="file-input-2" class="hidden" accept="image/*">
+                    </div>
+                </div>
+                <div id="file-names">
+                    <p class="file-name" id="file-name-1"></p>
+                    <p class="file-name" id="file-name-2"></p>
+                </div>
+                <button class="action-button" id="generate-btn" disabled>请先上传两张图片</button>
+            </section>
+            
+            <section class="output-section" id="output-section">
+                <h2>输出端</h2>
+                <div class="loader hidden" id="loader"></div>
+                <div class="result-placeholder" id="result-placeholder">
+                    <p>上传图片后，点击“生成结果”进行分析</p>
+                </div>
+                <div id="result-container" class="hidden">
+                    <p class="result-title">白癜风阶段预测结果</p>
+                    <div class="result-buttons">
+                        <button class="result-btn" id="result-stable">稳定期</button>
+                        <button class="result-btn" id="result-active">进展期</button>
+                    </div>
+                    <div class="confidence">
+                        <span>置信度: </span>
+                        <span class="confidence-value" id="confidence-value"></span>
+                    </div>
+                    <a href="#" id="toggle-details">详情查看</a>
+                    
+                    <div id="details-view" class="hidden">
+                        <h3>模型判断过程</h3>
+                        <ul class="details-list" id="details-list">
+                            </ul>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script>
+        // --- DOM 元素获取 ---
+        const uploadBox1 = document.getElementById('upload-box-1');
+        const uploadBox2 = document.getElementById('upload-box-2');
+        const fileInput1 = document.getElementById('file-input-1');
+        const fileInput2 = document.getElementById('file-input-2');
+        const preview1 = document.getElementById('preview-1');
+        const preview2 = document.getElementById('preview-2');
+        const prompt1 = document.getElementById('prompt-1');
+        const prompt2 = document.getElementById('prompt-2');
+        const fileName1 = document.getElementById('file-name-1');
+        const fileName2 = document.getElementById('file-name-2');
+        const generateBtn = document.getElementById('generate-btn');
+        const loader = document.getElementById('loader');
+        const resultPlaceholder = document.getElementById('result-placeholder');
+        const resultContainer = document.getElementById('result-container');
+        const resultStableBtn = document.getElementById('result-stable');
+        const resultActiveBtn = document.getElementById('result-active');
+        const confidenceValue = document.getElementById('confidence-value');
+        const toggleDetailsBtn = document.getElementById('toggle-details');
+        const detailsView = document.getElementById('details-view');
+        const detailsList = document.getElementById('details-list');
+
+        let file1 = null;
+        let file2 = null;
+
+        // --- 事件监听器 ---
+        fileInput1.addEventListener('change', (e) => handleFileSelect(e, 1));
+        fileInput2.addEventListener('change', (e) => handleFileSelect(e, 2));
+        generateBtn.addEventListener('click', handleGenerateResult);
+        toggleDetailsBtn.addEventListener('click', toggleDetails);
+
+        // --- 功能函数 ---
+        
+        // 文件上传与预览处理
+        function handleFileSelect(event, boxNumber) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const preview = boxNumber === 1 ? preview1 : preview2;
+            const prompt = boxNumber === 1 ? prompt1 : prompt2;
+            const fileName = boxNumber === 1 ? fileName1 : fileName2;
+
+            if (boxNumber === 1) file1 = file;
+            if (boxNumber === 2) file2 = file;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                preview.src = e.target.result;
+                preview.classList.remove('hidden');
+                prompt.classList.add('hidden');
+            }
+            reader.readAsDataURL(file);
+            fileName.textContent = `已选择: ${file.name}`;
+            
+            // 检查是否可以启用生成按钮
+            if (file1 && file2) {
+                generateBtn.disabled = false;
+                generateBtn.textContent = '生成结果';
+            }
+        }
+
+        // 处理点击“生成结果”
+        function handleGenerateResult() {
+            // 1. 显示加载动画，隐藏旧结果
+            loader.classList.remove('hidden');
+            resultPlaceholder.classList.add('hidden');
+            resultContainer.classList.add('hidden');
+            detailsView.classList.add('hidden'); // 每次生成都默认折叠详情
+            toggleDetailsBtn.textContent = '详情查看';
+
+            // 2. --- 真实后端API调用 ---
+            // 创建FormData对象来发送文件
+            const formData = new FormData();
+            formData.append('clinical_image', file1);
+            formData.append('woods_image', file2);
+
+            // 发送到后端API
+            fetch('/predict', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => Promise.reject(err));
+                }
+                return response.json();
+            })
+            .then(data => {
+                // 3. 渲染结果
+                renderResults(data);
+            })
+            .catch(error => {
+                console.error('API调用失败:', error);
+                
+                // 如果API失败，显示错误信息或使用备用数据
+                loader.classList.add('hidden');
+                resultPlaceholder.classList.remove('hidden');
+                resultPlaceholder.innerHTML = `
+                    <p style="color: #dc3545;">
+                        预测失败: ${error.error || error.message || '网络连接错误'}
+                    </p>
+                    <p style="color: #6c757d; font-size: 0.9rem;">
+                        请检查网络连接或稍后重试
+                    </p>
+                `;
+            });
+        }
+
+        // 渲染结果到界面
+        function renderResults(data) {
+            loader.classList.add('hidden');
+            resultContainer.classList.remove('hidden');
+
+            // 更新最终结果
+            resultStableBtn.classList.remove('active');
+            resultActiveBtn.classList.remove('active');
+            if (data.final_prediction === '稳定期') {
+                resultStableBtn.classList.add('active');
+            } else {
+                resultActiveBtn.classList.add('active');
+            }
+            
+            // 更新置信度
+            confidenceValue.textContent = data.confidence;
+            
+            // 更新详细过程列表
+            detailsList.innerHTML = ''; // 清空旧列表
+            data.details.forEach(item => {
+                const li = document.createElement('li');
+                li.innerHTML = `<span class="prompt">${item.prompt}</span> <span class="answer">${item.answer}</span>`;
+                detailsList.appendChild(li);
+            });
+        }
+        
+        // 切换详情视图的显示与隐藏
+        function toggleDetails(e) {
+            e.preventDefault();
+            const isHidden = detailsView.classList.contains('hidden');
+            if (isHidden) {
+                detailsView.classList.remove('hidden');
+                toggleDetailsBtn.textContent = '收起详情';
+            } else {
+                detailsView.classList.add('hidden');
+                toggleDetailsBtn.textContent = '详情查看';
+            }
+        }
+    </script>
+
+</body>
+</html>

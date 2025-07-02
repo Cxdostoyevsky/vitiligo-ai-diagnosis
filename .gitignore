@@ -1,0 +1,67 @@
+# Python相关
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 虚拟环境
+venv/
+ENV/
+env/
+.env
+
+# IDE相关
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 系统文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 项目特定文件
+uploads/          # 用户上传的图片，不需要版本控制
+prediction_logs.json  # 预测日志，包含用户数据
+model/*.pth       # PyTorch模型文件太大，不适合git
+model/*.pt
+model/*.pkl
+
+# 日志文件
+*.log
+logs/
+
+# 临时文件
+*.tmp
+*.temp
+
+# 配置文件（如果包含敏感信息）
+config.json
+.env.local
+.env.production
+
+# 测试文件
+test_images/
+sample_data/ 
