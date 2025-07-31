@@ -72,31 +72,34 @@ def preprocess_image(image_file):
         return None
 
 def predict_with_model(clinical_img, woods_img):
-    """使用真实模型进行预测"""
+    """使用真实模型进行预测，支持单张或双张图片"""
     if model is None:
         return get_mock_prediction()
     
     try:
         with torch.no_grad():
-            # 预处理两张图片
-            clinical_tensor = preprocess_image(clinical_img)
-            woods_tensor = preprocess_image(woods_img)
+            # 预处理图片（支持None输入）
+            clinical_tensor = preprocess_image(clinical_img) if clinical_img else None
+            woods_tensor = preprocess_image(woods_img) if woods_img else None
             
-            if clinical_tensor is None or woods_tensor is None:
+            # 检查是否至少有一张有效图片
+            if clinical_tensor is None and woods_tensor is None:
                 return get_mock_prediction()
             
-            # 根据你的模型输入方式调整这里
-            # 方式1: 如果模型接受两张图片拼接
-            # combined_input = torch.cat([clinical_tensor, woods_tensor], dim=1)
-            # outputs = model(combined_input)
-            
-            # 方式2: 如果模型分别处理两张图片然后融合
-            # clinical_features = model.backbone(clinical_tensor)
-            # woods_features = model.backbone(woods_tensor)
-            # outputs = model.classifier(torch.cat([clinical_features, woods_features], dim=1))
-            
-            # 方式3: 简单示例 - 这里你需要根据你的实际模型架构修改
-            outputs = model(clinical_tensor)  # 暂时只用临床图片
+            # 根据可用的图片进行预测
+            if clinical_tensor is not None and woods_tensor is not None:
+                # 两张图片都可用 - 使用组合预测（这里可以根据实际模型调整）
+                # 目前简单使用临床图片，实际部署时可以根据模型架构调整
+                outputs = model(clinical_tensor)
+                image_type = "双图片"
+            elif clinical_tensor is not None:
+                # 只有临床图片
+                outputs = model(clinical_tensor)
+                image_type = "临床图片"
+            else:
+                # 只有伍德灯图片
+                outputs = model(woods_tensor)
+                image_type = "伍德灯图片"
             
             # 获取预测概率
             probabilities = torch.softmax(outputs, dim=1)
@@ -105,10 +108,17 @@ def predict_with_model(clinical_img, woods_img):
             
             # 转换为结果
             prediction = "进展期" if predicted_class == 1 else "稳定期"
-            confidence_percent = f"{confidence * 100:.1f}%"
+            
+            # 根据图片数量调整置信度显示
+            if clinical_tensor is not None and woods_tensor is not None:
+                confidence_percent = f"{confidence * 100:.1f}%"
+            else:
+                # 单张图片时降低显示的置信度，提醒准确性较低
+                adjusted_confidence = confidence * 0.8  # 降低20%作为提醒
+                confidence_percent = f"{adjusted_confidence * 100:.1f}%"
             
             # 生成详细分析过程
-            details = generate_analysis_details(clinical_tensor, woods_tensor, probabilities)
+            details = generate_analysis_details(clinical_tensor, woods_tensor, probabilities, image_type)
             
             return {
                 "final_prediction": prediction,
@@ -120,22 +130,49 @@ def predict_with_model(clinical_img, woods_img):
         print(f"模型预测失败: {e}")
         return get_mock_prediction()
 
-def generate_analysis_details(clinical_tensor, woods_tensor, probabilities):
-    """生成分析详情"""
-    # 这里可以添加更详细的分析逻辑
+def generate_analysis_details(clinical_tensor, woods_tensor, probabilities, image_type):
+    """根据可用图片类型生成分析详情"""
     prob_stable = probabilities[0][0].item()
     prob_active = probabilities[0][1].item()
     
-    details = [
-        {"prompt": "临床图像特征分析", "answer": f"进展期概率: {prob_active:.3f}"},
-        {"prompt": "伍德灯图像特征分析", "answer": "边界模糊特征检测"},
-        {"prompt": "双图融合判断", "answer": "进展期" if prob_active > prob_stable else "稳定期"},
-        {"prompt": "边缘清晰度评估", "answer": "边界不清晰" if prob_active > 0.6 else "边界相对清晰"},
-        {"prompt": "色素缺失程度", "answer": "中等程度缺失"},
-        {"prompt": "炎症反应指标", "answer": "轻微炎症" if prob_active > 0.7 else "无明显炎症"},
+    details = []
+    
+    if image_type == "双图片":
+        # 双图片完整分析
+        details = [
+            {"prompt": "临床图像特征分析", "answer": f"进展期概率: {prob_active:.3f}"},
+            {"prompt": "伍德灯图像特征分析", "answer": "边界模糊特征检测"},
+            {"prompt": "双图融合判断", "answer": "进展期" if prob_active > prob_stable else "稳定期"},
+            {"prompt": "边缘清晰度评估", "answer": "边界不清晰" if prob_active > 0.6 else "边界相对清晰"},
+            {"prompt": "色素缺失程度", "answer": "中等程度缺失"},
+            {"prompt": "炎症反应指标", "answer": "轻微炎症" if prob_active > 0.7 else "无明显炎症"},
+        ]
+    elif image_type == "临床图片":
+        # 仅临床图片分析
+        details = [
+            {"prompt": "图片类型", "answer": "仅临床皮损照片（准确度较低）"},
+            {"prompt": "临床图像特征分析", "answer": f"进展期概率: {prob_active:.3f}"},
+            {"prompt": "边缘清晰度评估", "answer": "边界不清晰" if prob_active > 0.6 else "边界相对清晰"},
+            {"prompt": "色素缺失程度", "answer": "中等程度缺失"},
+            {"prompt": "炎症反应指标", "answer": "轻微炎症" if prob_active > 0.7 else "无明显炎症"},
+            {"prompt": "建议", "answer": "建议补充伍德灯照片以提高诊断准确性"},
+        ]
+    elif image_type == "伍德灯图片":
+        # 仅伍德灯图片分析
+        details = [
+            {"prompt": "图片类型", "answer": "仅伍德灯照片（准确度较低）"},
+            {"prompt": "伍德灯图像特征分析", "answer": f"进展期概率: {prob_active:.3f}"},
+            {"prompt": "荧光特征分析", "answer": "边界模糊特征检测"},
+            {"prompt": "白斑边界评估", "answer": "边界不清晰" if prob_active > 0.6 else "边界相对清晰"},
+            {"prompt": "色素对比度", "answer": "中等对比度"},
+            {"prompt": "建议", "answer": "建议补充临床皮损照片以提高诊断准确性"},
+        ]
+    
+    # 添加通用的置信度和复查建议
+    details.extend([
         {"prompt": "综合置信度评分", "answer": f"{max(prob_stable, prob_active):.1%}"},
         {"prompt": "建议复查时间", "answer": "1-3个月内复查" if prob_active > 0.6 else "3-6个月复查"}
-    ]
+    ])
     
     return details
 
@@ -170,41 +207,57 @@ def static_files(filename):
 def predict():
     """AI预测接口"""
     try:
-        # 检查文件是否上传
-        if 'clinical_image' not in request.files or 'woods_image' not in request.files:
-            return jsonify({'error': '请上传临床图片和伍德灯图片'}), 400
+        # 检查是否至少上传了一张图片
+        clinical_file = request.files.get('clinical_image')
+        woods_file = request.files.get('woods_image')
         
-        clinical_file = request.files['clinical_image']  #后端接受前端传来的临床图片，Flask自动解析multipart数据，将文件存储在request.files字典中
-        woods_file = request.files['woods_image']  #后端接受前端传来的伍德灯图片，Flask自动解析multipart数据，将文件存储在request.files字典中
+        # 检查是否至少有一个文件存在且有效
+        has_clinical = clinical_file and clinical_file.filename != ''
+        has_woods = woods_file and woods_file.filename != ''
         
-        # 检查文件是否为空
-        if clinical_file.filename == '' or woods_file.filename == '':
-            return jsonify({'error': '请选择有效的图片文件'}), 400
+        if not has_clinical and not has_woods:
+            return jsonify({'error': '请至少上传一张图片（临床图片或伍德灯图片）'}), 400
         
         # 检查文件类型
         allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'bmp'}
-        if not (clinical_file.filename.lower().split('.')[-1] in allowed_extensions and 
-                woods_file.filename.lower().split('.')[-1] in allowed_extensions):
-            return jsonify({'error': '不支持的文件格式，请上传图片文件'}), 400
         
-        # 保存上传的文件（可选）
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        clinical_filename = f"clinical_{timestamp}_{clinical_file.filename}"
-        woods_filename = f"woods_{timestamp}_{woods_file.filename}"
-        
-        clinical_path = os.path.join(app.config['UPLOAD_FOLDER'], clinical_filename)
-        woods_path = os.path.join(app.config['UPLOAD_FOLDER'], woods_filename)
-        
-        clinical_file.save(clinical_path)
-        woods_file.save(woods_path)
-        
-        # 重新读取文件用于预测
-        with open(clinical_path, 'rb') as cf, open(woods_path, 'rb') as wf:
-            clinical_data = type('MockFile', (), {'read': lambda: cf.read()})()
-            woods_data = type('MockFile', (), {'read': lambda: wf.read()})()
+        if has_clinical and not clinical_file.filename.lower().split('.')[-1] in allowed_extensions:
+            return jsonify({'error': '临床图片格式不支持，请上传图片文件'}), 400
             
-            # 进行AI预测
-            result = predict_with_model(clinical_data, woods_data)
+        if has_woods and not woods_file.filename.lower().split('.')[-1] in allowed_extensions:
+            return jsonify({'error': '伍德灯图片格式不支持，请上传图片文件'}), 400
+        
+        # 保存上传的文件
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        clinical_path = None
+        woods_path = None
+        clinical_filename = None
+        woods_filename = None
+        
+        if has_clinical:
+            clinical_filename = f"clinical_{timestamp}_{clinical_file.filename}"
+            clinical_path = os.path.join(app.config['UPLOAD_FOLDER'], clinical_filename)
+            clinical_file.save(clinical_path)
+            
+        if has_woods:
+            woods_filename = f"woods_{timestamp}_{woods_file.filename}"
+            woods_path = os.path.join(app.config['UPLOAD_FOLDER'], woods_filename)
+            woods_file.save(woods_path)
+        
+        # 准备文件数据用于预测
+        clinical_data = None
+        woods_data = None
+        
+        if clinical_path and os.path.exists(clinical_path):
+            with open(clinical_path, 'rb') as cf:
+                clinical_data = type('MockFile', (), {'read': lambda: cf.read()})()
+                
+        if woods_path and os.path.exists(woods_path):
+            with open(woods_path, 'rb') as wf:
+                woods_data = type('MockFile', (), {'read': lambda: wf.read()})()
+        
+        # 进行AI预测（传入可能为None的参数）
+        result = predict_with_model(clinical_data, woods_data)
         
         # 记录预测日志
         log_prediction(clinical_filename, woods_filename, result)

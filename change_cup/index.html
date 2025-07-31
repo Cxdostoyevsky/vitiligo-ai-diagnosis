@@ -319,7 +319,7 @@
                     <p class="file-name" id="file-name-1"></p>
                     <p class="file-name" id="file-name-2"></p>
                 </div>
-                <button class="action-button" id="generate-btn" disabled>请先上传两张图片</button>
+                <button class="action-button" id="generate-btn" disabled>请先上传至少一张图片</button>
             </section>
             
             <section class="output-section" id="output-section">
@@ -405,15 +405,33 @@
             reader.readAsDataURL(file);
             fileName.textContent = `已选择: ${file.name}`;
             
-            // 检查是否可以启用生成按钮
-            if (file1 && file2) {
+            // 检查是否可以启用生成按钮 - 现在只需要至少一张图片
+            updateGenerateButton();
+        }
+
+        // 更新生成按钮的状态和文本
+        function updateGenerateButton() {
+            const hasOneImage = file1 || file2;
+            const hasBothImages = file1 && file2;
+            
+            if (hasOneImage) {
                 generateBtn.disabled = false;
-                generateBtn.textContent = '生成结果';
+                if (hasBothImages) {
+                    generateBtn.textContent = '生成结果';
+                } else {
+                    generateBtn.textContent = '生成结果（单张图片，准确度较低）';
+                }
+            } else {
+                generateBtn.disabled = true;
+                generateBtn.textContent = '请先上传至少一张图片';
             }
         }
 
         // 处理点击“生成结果”
         function handleGenerateResult() {
+            // 检查图片数量
+            const hasBothImages = file1 && file2;
+            
             // 1. 显示加载动画，隐藏旧结果
             loader.classList.remove('hidden'); // 显示加载动画，转圈圈
             resultPlaceholder.classList.add('hidden'); // 隐藏请上传两张图片
@@ -424,8 +442,8 @@
             // 2. --- 真实后端API调用 ---
             // 创建FormData对象来发送文件
             const formData = new FormData();
-            formData.append('clinical_image', file1); // 将file1添加到formData中
-            formData.append('woods_image', file2); // 将file2添加到formData中
+            if (file1) formData.append('clinical_image', file1); // 只在文件存在时添加
+            if (file2) formData.append('woods_image', file2); // 只在文件存在时添加
 
             // 发送到后端API
             fetch('/predict', {
@@ -463,6 +481,18 @@
         function renderResults(data) {
             loader.classList.add('hidden'); // 隐藏加载动画
             resultContainer.classList.remove('hidden'); // 显示结果
+
+            // 检查是否只有一张图片，显示相应警告
+            const hasBothImages = file1 && file2;
+            if (!hasBothImages) {
+                // 在结果标题下方显示警告
+                const resultTitle = document.querySelector('.result-title');
+                resultTitle.innerHTML = '白癜风阶段预测结果 <small style="color: #dc3545; font-weight: normal; display: block; font-size: 0.8rem; margin-top: 0.5rem;">⚠️ 仅使用单张图片分析，准确度较低，建议上传两张图片</small>';
+            } else {
+                // 恢复正常标题
+                const resultTitle = document.querySelector('.result-title');
+                resultTitle.innerHTML = '白癜风阶段预测结果';
+            }
 
             // 更新最终结果
             resultStableBtn.classList.remove('active'); // 移除稳定期的样式
