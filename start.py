@@ -74,8 +74,8 @@ def start_server():
     print("="*50)
     
     try:
-        # 导入并启动app
-        from app import app
+        # 导入并启动app,从app文件中导入flask应用实例app
+        from app import app   
         print("\n📍 服务地址:")
         print("   本地访问: http://localhost:8080")
         print("   网络访问: http://0.0.0.0:8080")
@@ -89,7 +89,7 @@ def start_server():
         print("\n按 Ctrl+C 停止服务")
         print("-"*50)
         
-        app.run(debug=True, host='0.0.0.0', port=8080)
+        app.run(debug=True, host='0.0.0.0', port=8080)  #开启调试模式，监听所有网络接口，端口8080
         
     except ImportError as e:
         print(f"❌ 导入失败: {e}")

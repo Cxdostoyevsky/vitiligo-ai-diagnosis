@@ -377,10 +377,10 @@
         let file2 = null;
 
         // --- 事件监听器 ---
-        fileInput1.addEventListener('change', (e) => handleFileSelect(e, 1));
-        fileInput2.addEventListener('change', (e) => handleFileSelect(e, 2));
-        generateBtn.addEventListener('click', handleGenerateResult);
-        toggleDetailsBtn.addEventListener('click', toggleDetails);
+        fileInput1.addEventListener('change', (e) => handleFileSelect(e, 1)); // 当fileInput1的值发生变化时，调用handleFileSelect函数，并传入e和1
+        fileInput2.addEventListener('change', (e) => handleFileSelect(e, 2)); // 当fileInput2的值发生变化时，调用handleFileSelect函数，并传入e和2
+        generateBtn.addEventListener('click', handleGenerateResult); // 当generateBtn被点击时，调用handleGenerateResult函数
+        toggleDetailsBtn.addEventListener('click', toggleDetails); // 当toggleDetailsBtn被点击时，调用toggleDetails函数
 
         // --- 功能函数 ---
         
@@ -395,7 +395,7 @@
 
             if (boxNumber === 1) file1 = file;
             if (boxNumber === 2) file2 = file;
-            
+            // 创建图片预览，将图片转换为base64格式，并显示在页面上
             const reader = new FileReader();
             reader.onload = function(e) {
                 preview.src = e.target.result;
@@ -415,17 +415,17 @@
         // 处理点击“生成结果”
         function handleGenerateResult() {
             // 1. 显示加载动画，隐藏旧结果
-            loader.classList.remove('hidden');
-            resultPlaceholder.classList.add('hidden');
-            resultContainer.classList.add('hidden');
+            loader.classList.remove('hidden'); // 显示加载动画，转圈圈
+            resultPlaceholder.classList.add('hidden'); // 隐藏请上传两张图片
+            resultContainer.classList.add('hidden'); // 隐藏旧结果
             detailsView.classList.add('hidden'); // 每次生成都默认折叠详情
-            toggleDetailsBtn.textContent = '详情查看';
+            toggleDetailsBtn.textContent = '详情查看'; // 每次生成都默认折叠详情
 
             // 2. --- 真实后端API调用 ---
             // 创建FormData对象来发送文件
             const formData = new FormData();
-            formData.append('clinical_image', file1);
-            formData.append('woods_image', file2);
+            formData.append('clinical_image', file1); // 将file1添加到formData中
+            formData.append('woods_image', file2); // 将file2添加到formData中
 
             // 发送到后端API
             fetch('/predict', {
@@ -461,16 +461,16 @@
 
         // 渲染结果到界面
         function renderResults(data) {
-            loader.classList.add('hidden');
-            resultContainer.classList.remove('hidden');
+            loader.classList.add('hidden'); // 隐藏加载动画
+            resultContainer.classList.remove('hidden'); // 显示结果
 
             // 更新最终结果
-            resultStableBtn.classList.remove('active');
-            resultActiveBtn.classList.remove('active');
+            resultStableBtn.classList.remove('active'); // 移除稳定期的样式
+            resultActiveBtn.classList.remove('active'); // 移除进展期的样式
             if (data.final_prediction === '稳定期') {
-                resultStableBtn.classList.add('active');
+                resultStableBtn.classList.add('active'); // 添加稳定期的样式
             } else {
-                resultActiveBtn.classList.add('active');
+                resultActiveBtn.classList.add('active'); // 添加进展期的样式
             }
             
             // 更新置信度

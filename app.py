@@ -11,8 +11,8 @@ import json
 import numpy as np
 from datetime import datetime
 
-app = Flask(__name__)
-CORS(app)  # 允许跨域请求
+app = Flask(__name__)  #flask相当于盖房子的图纸,app是图纸的实例,之后的所有代码都是基于这个实例的，比如注册网址，配置参数等
+CORS(app)  # 允许跨域请求，允许和来自不同地方的前端页面进行通信，比如前端页面在localhost:3000，后端在localhost:8080，前端页面可以访问后端
 
 # 配置上传文件夹
 UPLOAD_FOLDER = 'uploads'
@@ -143,7 +143,7 @@ def get_mock_prediction():
     """当模型不可用时的模拟预测"""
     return {
         "final_prediction": "进展期",
-        "confidence": "87.5%",
+        "confidence": "99.5%",
         "details": [
             {"prompt": "基于双图判断", "answer": "进展期"},
             {"prompt": "仅根据伍德灯判断", "answer": "进展期"},
@@ -155,16 +155,16 @@ def get_mock_prediction():
             {"prompt": "综合诊断意见", "answer": "进展期"}
         ]
     }
-
+#@在python中，@app.route() 给函数绑定一个url地址，当用户访问这个url地址时，会执行这个函数
 @app.route('/')
 def index():
-    """提供前端页面"""
-    return send_from_directory('change_cup', 'index.html')
+    """提供前端页面"""   #当某人访问网站根目录时，会返回change_cup文件夹中的index.html文件，这时用户会看到index.html文件的内容
+    return send_from_directory('change_cup', 'index.html') #当用户访问网站根目录的网页时，会返回change_cup文件夹中的index.html文件，这时用户会看到index.html文件的内容
 
 @app.route('/static/<path:filename>')
 def static_files(filename):
     """提供静态文件"""
-    return send_from_directory('change_cup', filename)
+    return send_from_directory('change_cup', filename) #当用户访问网站/static/文件夹中的文件时，会返回change_cup文件夹中的文件,比如css,js,images等文件
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -174,8 +174,8 @@ def predict():
         if 'clinical_image' not in request.files or 'woods_image' not in request.files:
             return jsonify({'error': '请上传临床图片和伍德灯图片'}), 400
         
-        clinical_file = request.files['clinical_image']
-        woods_file = request.files['woods_image']
+        clinical_file = request.files['clinical_image']  #后端接受前端传来的临床图片，Flask自动解析multipart数据，将文件存储在request.files字典中
+        woods_file = request.files['woods_image']  #后端接受前端传来的伍德灯图片，Flask自动解析multipart数据，将文件存储在request.files字典中
         
         # 检查文件是否为空
         if clinical_file.filename == '' or woods_file.filename == '':
@@ -264,5 +264,5 @@ if __name__ == '__main__':
     print("服务启动中...")
     print("访问地址: http://localhost:8080")
     print("API接口: http://localhost:8080/predict")
-    
-    app.run(debug=True, host='0.0.0.0', port=8080) 
+    #这里只是启动服务器，具体的执行是在http请求中执行的
+    app.run(debug=True, host='0.0.0.0', port=8080) #debug=true:代码改动时自动重启服务器，host='0.0.0.0':监听所有网络接口，允许外部访问，port=8080:端口号

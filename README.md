@@ -4,6 +4,12 @@
 
 ## 🚀 快速开始
 
+整个项目整体上分为三种：
+css+html+javascript
+css:样式语法
+html:网页结构和内容
+javascript:交互式功能
+
 ### 1. 安装依赖
 
 ```bash
@@ -19,7 +25,7 @@ pip install -r requirements.txt
 ### 3. 启动服务
 
 ```bash
-python start.py
+python3 start.py
 ```
 
 或者直接运行：

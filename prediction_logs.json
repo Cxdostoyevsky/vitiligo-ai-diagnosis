@@ -1,0 +1,107 @@
+[
+  {
+    "timestamp": "2025-07-02T09:16:26.968219",
+    "clinical_image": "clinical_20250702_091626_1.png",
+    "woods_image": "woods_20250702_091626_WechatIMG9.jpg",
+    "prediction": "进展期",
+    "confidence": "87.5%"
+  },
+  {
+    "timestamp": "2025-07-02T10:24:32.076330",
+    "clinical_image": "clinical_20250702_102432_GHfhlBWbAAAcwMC.jpeg",
+    "woods_image": "woods_20250702_102432_WechatIMG5.jpg",
+    "prediction": "进展期",
+    "confidence": "87.5%"
+  },
+  {
+    "timestamp": "2025-07-02T10:25:11.400840",
+    "clinical_image": "clinical_20250702_102511_WechatIMG9.jpg",
+    "woods_image": "woods_20250702_102511_1.png",
+    "prediction": "进展期",
+    "confidence": "87.5%"
+  },
+  {
+    "timestamp": "2025-07-02T10:25:17.533993",
+    "clinical_image": "clinical_20250702_102517_WechatIMG9.jpg",
+    "woods_image": "woods_20250702_102517_1.png",
+    "prediction": "进展期",
+    "confidence": "87.5%"
+  },
+  {
+    "timestamp": "2025-07-02T10:25:19.692481",
+    "clinical_image": "clinical_20250702_102519_WechatIMG9.jpg",
+    "woods_image": "woods_20250702_102519_1.png",
+    "prediction": "进展期",
+    "confidence": "87.5%"
+  },
+  {
+    "timestamp": "2025-07-02T10:25:21.032117",
+    "clinical_image": "clinical_20250702_102521_WechatIMG9.jpg",
+    "woods_image": "woods_20250702_102521_1.png",
+    "prediction": "进展期",
+    "confidence": "87.5%"
+  },
+  {
+    "timestamp": "2025-07-02T10:25:22.967752",
+    "clinical_image": "clinical_20250702_102522_WechatIMG9.jpg",
+    "woods_image": "woods_20250702_102522_1.png",
+    "prediction": "进展期",
+    "confidence": "87.5%"
+  },
+  {
+    "timestamp": "2025-07-02T10:25:24.927721",
+    "clinical_image": "clinical_20250702_102524_WechatIMG9.jpg",
+    "woods_image": "woods_20250702_102524_1.png",
+    "prediction": "进展期",
+    "confidence": "87.5%"
+  },
+  {
+    "timestamp": "2025-07-02T10:25:27.563268",
+    "clinical_image": "clinical_20250702_102527_WechatIMG9.jpg",
+    "woods_image": "woods_20250702_102527_1.png",
+    "prediction": "进展期",
+    "confidence": "87.5%"
+  },
+  {
+    "timestamp": "2025-07-02T10:43:49.886756",
+    "clinical_image": "clinical_20250702_104349_WechatIMG9.jpg",
+    "woods_image": "woods_20250702_104349_1.png",
+    "prediction": "进展期",
+    "confidence": "99.5%"
+  },
+  {
+    "timestamp": "2025-07-03T16:49:23.463892",
+    "clinical_image": "clinical_20250703_164923_WechatIMG9.jpg",
+    "woods_image": "woods_20250703_164923_1.png",
+    "prediction": "进展期",
+    "confidence": "99.5%"
+  },
+  {
+    "timestamp": "2025-07-03T17:04:28.516194",
+    "clinical_image": "clinical_20250703_170428_WX20250703-155053@2x.png",
+    "woods_image": "woods_20250703_170428_WX20250703-153817@2x.png",
+    "prediction": "进展期",
+    "confidence": "99.5%"
+  },
+  {
+    "timestamp": "2025-07-31T14:31:12.299317",
+    "clinical_image": "clinical_20250731_143112_1.png",
+    "woods_image": "woods_20250731_143112_1.jpeg",
+    "prediction": "进展期",
+    "confidence": "99.5%"
+  },
+  {
+    "timestamp": "2025-07-31T14:31:47.124420",
+    "clinical_image": "clinical_20250731_143147_1.png",
+    "woods_image": "woods_20250731_143147_1.jpeg",
+    "prediction": "进展期",
+    "confidence": "99.5%"
+  },
+  {
+    "timestamp": "2025-07-31T14:31:48.742011",
+    "clinical_image": "clinical_20250731_143148_1.png",
+    "woods_image": "woods_20250731_143148_1.jpeg",
+    "prediction": "进展期",
+    "confidence": "99.5%"
+  }
+]
