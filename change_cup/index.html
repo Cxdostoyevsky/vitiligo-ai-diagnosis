@@ -253,6 +253,7 @@
             justify-content: space-between;
             align-items: center;
             font-size: 0.9rem;
+            flex-wrap: wrap;
         }
         
         .details-list .prompt {
@@ -262,6 +263,35 @@
         .details-list .answer {
             font-weight: 700;
             color: var(--primary-hover);
+        }
+
+        .details-images {
+            width: 100%;
+            margin-top: 0.5rem;
+            display: flex;
+            gap: 0.5rem;
+            justify-content: flex-start;
+        }
+
+        .details-image {
+            width: 60px;
+            height: 60px;
+            border-radius: 4px;
+            object-fit: cover;
+            border: 1px solid var(--border-color);
+        }
+
+        .details-image-label {
+            font-size: 0.7rem;
+            color: #6c757d;
+            text-align: center;
+            margin-top: 0.2rem;
+        }
+
+        .details-image-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
         /* --- 加载动画 --- */
@@ -510,7 +540,63 @@
             detailsList.innerHTML = ''; // 清空旧列表
             data.details.forEach(item => {
                 const li = document.createElement('li');
-                li.innerHTML = `<span class="prompt">${item.prompt}</span> <span class="answer">${item.answer}</span>`;
+                
+                // 基本的文本内容
+                const textContent = `<span class="prompt">${item.prompt}</span> <span class="answer">${item.answer}</span>`;
+                
+                // 根据prompt内容决定显示哪些图片
+                let imagesHtml = '';
+                const prompt = item.prompt.toLowerCase();
+                
+                // 检查是否需要显示图片
+                if (prompt.includes('双图') || prompt.includes('两图')) {
+                    // 显示两张图片
+                    imagesHtml = '<div class="details-images">';
+                    if (preview1.src && !preview1.classList.contains('hidden')) {
+                        imagesHtml += `
+                            <div class="details-image-container">
+                                <img src="${preview1.src}" alt="临床照片" class="details-image">
+                                <div class="details-image-label">临床照片</div>
+                            </div>
+                        `;
+                    }
+                    if (preview2.src && !preview2.classList.contains('hidden')) {
+                        imagesHtml += `
+                            <div class="details-image-container">
+                                <img src="${preview2.src}" alt="伍德灯照片" class="details-image">
+                                <div class="details-image-label">伍德灯照片</div>
+                            </div>
+                        `;
+                    }
+                    imagesHtml += '</div>';
+                } else if (prompt.includes('伍德灯') || prompt.includes('woods')) {
+                    // 仅显示伍德灯图片
+                    if (preview2.src && !preview2.classList.contains('hidden')) {
+                        imagesHtml = `
+                            <div class="details-images">
+                                <div class="details-image-container">
+                                    <img src="${preview2.src}" alt="伍德灯照片" class="details-image">
+                                    <div class="details-image-label">伍德灯照片</div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                } else if (prompt.includes('临床') || prompt.includes('clinical')) {
+                    // 仅显示临床图片
+                    if (preview1.src && !preview1.classList.contains('hidden')) {
+                        imagesHtml = `
+                            <div class="details-images">
+                                <div class="details-image-container">
+                                    <img src="${preview1.src}" alt="临床照片" class="details-image">
+                                    <div class="details-image-label">临床照片</div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+                
+                // 组合内容
+                li.innerHTML = textContent + imagesHtml;
                 detailsList.appendChild(li);
             });
         }
