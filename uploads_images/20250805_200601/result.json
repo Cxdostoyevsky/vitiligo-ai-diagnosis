@@ -2,7 +2,8 @@
     "final_prediction": "进展期",
     "confidence": "99.5%",
     "feature_maps": {
-        "clinical_feature": "uploads/temp/20250805_181604_379108/clinical_feature_mock.jpg"
+        "clinical_feature": "uploads/temp/20250805_200543_122848/clinical_feature.jpg",
+        "woods_feature": "uploads/temp/20250805_200543_122848/woods_feature.jpg"
     },
     "details": [
         {
@@ -38,5 +39,5 @@
             "answer": "问答：进展期\n分类：进展期"
         }
     ],
-    "temp_dir_name": "20250805_181604_379108"
+    "temp_dir_name": "20250805_200543_122848"
 }

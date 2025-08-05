@@ -21,7 +21,7 @@ app = Flask(__name__)  #flask相当于盖房子的图纸,app是图纸的实例,�
 CORS(app)  # 允许跨域请求，允许和来自不同地方的前端页面进行通信，比如前端页面在localhost:3000，后端在localhost:8080，前端页面可以访问后端
 
 # 配置上传文件夹
-UPLOAD_FOLDER = 'uploads'
+UPLOAD_FOLDER = 'uploads_images'
 TEMP_FOLDER = os.path.join(UPLOAD_FOLDER, 'temp')  # 临时文件夹
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
@@ -375,7 +375,7 @@ def get_mock_prediction(clinical_path=None, woods_path=None, temp_path=None):
             if clinical_features_data and 'gradient_map' in clinical_features_data:
                 overlay_img = create_overlay_image(cv2.imread(clinical_path), clinical_features_data['gradient_map'])
                 if overlay_img is not None:
-                    feature_filename = "clinical_feature_mock.jpg"
+                    feature_filename = "clinical_feature.jpg"
                     save_path = os.path.join(temp_path, feature_filename)
                     cv2.imwrite(save_path, overlay_img)
                     feature_maps["clinical_feature"] = f"uploads/temp/{temp_dir_name}/{feature_filename}"
@@ -385,7 +385,7 @@ def get_mock_prediction(clinical_path=None, woods_path=None, temp_path=None):
             if woods_features_data and 'gradient_map' in woods_features_data:
                 overlay_img = create_overlay_image(cv2.imread(woods_path), woods_features_data['gradient_map'])
                 if overlay_img is not None:
-                    feature_filename = "woods_feature_mock.jpg"
+                    feature_filename = "woods_feature.jpg"
                     save_path = os.path.join(temp_path, feature_filename)
                     cv2.imwrite(save_path, overlay_img)
                     feature_maps["woods_feature"] = f"uploads/temp/{temp_dir_name}/{feature_filename}"
@@ -464,12 +464,12 @@ def predict():
         clinical_filename, woods_filename = None, None
 
         if has_clinical:
-            clinical_filename = secure_filename(f"clinical_{clinical_file.filename}")
+            clinical_filename = secure_filename(f"clinical.{clinical_file.filename.lower().split('.')[-1]}") #secure_filename: 确保文件名安全，防止被hacker恶意文件名攻击
             clinical_path = os.path.join(temp_path, clinical_filename)
             clinical_file.save(clinical_path)
             
         if has_woods:
-            woods_filename = secure_filename(f"woods_{woods_file.filename}")
+            woods_filename = secure_filename(f"woods.{woods_file.filename.lower().split('.')[-1]}")
             woods_path = os.path.join(temp_path, woods_filename)
             woods_file.save(woods_path)
         
@@ -490,12 +490,6 @@ def predict():
         
         # 附加临时目录名和原始文件名到结果中
         result['temp_dir_name'] = temp_dir_name
-        # result['original_files'] = {
-        #     'clinical_image': clinical_filename,
-        #     'woods_image': woods_filename,
-        # }
-
-        # 移除不再需要发送到前端的冗余信息
         result.pop('files_to_save', None)
 
         # 将最终结果保存到临时目录中的result.json
