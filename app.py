@@ -10,16 +10,26 @@ import os
 import json
 import numpy as np
 from datetime import datetime
+import cv2
+import sys
+from werkzeug.utils import secure_filename
+from Feature_extran_vis_tools.feature_extractor import extract_woodlamp_edge_features
+import shutil
+
 
 app = Flask(__name__)  #flask相当于盖房子的图纸,app是图纸的实例,之后的所有代码都是基于这个实例的，比如注册网址，配置参数等
 CORS(app)  # 允许跨域请求，允许和来自不同地方的前端页面进行通信，比如前端页面在localhost:3000，后端在localhost:8080，前端页面可以访问后端
 
 # 配置上传文件夹
 UPLOAD_FOLDER = 'uploads'
+TEMP_FOLDER = os.path.join(UPLOAD_FOLDER, 'temp')  # 临时文件夹
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
+if not os.path.exists(TEMP_FOLDER):
+    os.makedirs(TEMP_FOLDER)
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['TEMP_FOLDER'] = TEMP_FOLDER  # 用于存储临时结果
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 限制文件大小为16MB
 
 # 全局变量存储模型
@@ -32,6 +42,97 @@ transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
+
+def cv2_to_base64(img_array, img_format='PNG'):
+    """将OpenCV图像数组转换为base64字符串"""
+    try:
+        # 将图像编码为指定格式
+        _, buffer = cv2.imencode(f'.{img_format.lower()}', img_array)
+        # 转换为base64
+        img_base64 = base64.b64encode(buffer).decode('utf-8')
+        return f"data:image/{img_format.lower()};base64,{img_base64}"
+    except Exception as e:
+        print(f"图像转base64失败: {e}")
+        return None
+
+def create_feature_heatmap(gradient_map, colormap=cv2.COLORMAP_JET):
+    """创建特征热力图"""
+    try:
+        # 归一化梯度图到0-255范围
+        normalized = cv2.normalize(gradient_map, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+        # 应用颜色映射
+        heatmap = cv2.applyColorMap(normalized, colormap)
+        return heatmap
+    except Exception as e:
+        print(f"创建热力图失败: {e}")
+        return None
+
+def create_overlay_image(original_img, gradient_map, alpha=0.6):
+    """创建叠加图像"""
+    try:
+        # 创建热力图
+        heatmap = create_feature_heatmap(gradient_map)
+        if heatmap is None:
+            return original_img
+            
+        # 确保尺寸匹配
+        if original_img.shape[:2] != heatmap.shape[:2]:
+            heatmap = cv2.resize(heatmap, (original_img.shape[1], original_img.shape[0]))
+        
+        # 创建阈值蒙版，只高亮显著特征区域
+        threshold = 20  # 可以调整这个值
+        _, mask = cv2.threshold(cv2.cvtColor(heatmap, cv2.COLOR_BGR2GRAY), threshold, 255, cv2.THRESH_BINARY)
+        mask_3channel = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+        
+        # 叠加图像
+        blended = cv2.addWeighted(original_img, 1-alpha, heatmap, alpha, 0)
+        # 只在有特征的区域显示叠加效果
+        overlay = np.where(mask_3channel > 0, blended, original_img)
+        
+        return overlay
+    except Exception as e:
+        print(f"创建叠加图失败: {e}")
+        return original_img
+
+def extract_features_from_image(image_path, image_type="clinical"):
+    """从图像中提取特征并生成可视化图像"""
+    try:
+        # 使用特征提取器
+        result = extract_woodlamp_edge_features(image_path)
+        if result is None:
+            return None
+            
+        features = result.get("features", {})
+        gradient_map = result.get("gradient_map")
+        
+        if gradient_map is None:
+            return None
+            
+        # 读取原始图像
+        original_img = cv2.imread(image_path)
+        if original_img is None:
+            return None
+            
+        # 根据图像类型选择颜色映射
+        colormap = cv2.COLORMAP_HOT if image_type == "clinical" else cv2.COLORMAP_COOL
+        
+        # 创建热力图
+        heatmap = create_feature_heatmap(gradient_map, colormap)
+        
+        # 创建叠加图
+        overlay = create_overlay_image(original_img, gradient_map)
+        
+        return {
+            "features": features,
+            "gradient_map": gradient_map,
+            "heatmap": heatmap,
+            "overlay": overlay,
+            "original": original_img
+        }
+        
+    except Exception as e:
+        print(f"特征提取失败: {e}")
+        return None
 
 def load_model():
     """加载训练好的PyTorch模型"""
@@ -71,10 +172,10 @@ def preprocess_image(image_file):
         print(f"图像预处理失败: {e}")
         return None
 
-def predict_with_model(clinical_img, woods_img):
+def predict_with_model(clinical_img=None, woods_img=None, clinical_path=None, woods_path=None, temp_path=None):
     """使用真实模型进行预测，支持单张或双张图片"""
     if model is None:
-        return get_mock_prediction()
+        return get_mock_prediction(clinical_path, woods_path, temp_path)
     
     try:
         with torch.no_grad():
@@ -84,7 +185,7 @@ def predict_with_model(clinical_img, woods_img):
             
             # 检查是否至少有一张有效图片
             if clinical_tensor is None and woods_tensor is None:
-                return get_mock_prediction()
+                return get_mock_prediction(clinical_path, woods_path, temp_path)
             
             # 根据可用的图片进行预测
             if clinical_tensor is not None and woods_tensor is not None:
@@ -117,18 +218,57 @@ def predict_with_model(clinical_img, woods_img):
                 adjusted_confidence = confidence * 0.8  # 降低20%作为提醒
                 confidence_percent = f"{adjusted_confidence * 100:.1f}%"
             
+            # 生成真实特征图并保存到临时目录
+            feature_maps = generate_real_feature_maps(clinical_path, woods_path, temp_path)
+            
             # 生成详细分析过程
             details = generate_analysis_details(clinical_tensor, woods_tensor, probabilities, image_type)
             
-            return {
+            result = {
                 "final_prediction": prediction,
                 "confidence": confidence_percent,
                 "details": details
             }
             
+            # 添加特征图（如果生成成功）
+            if feature_maps:
+                result["feature_maps"] = feature_maps
+            
+            return result
+            
     except Exception as e:
         print(f"模型预测失败: {e}")
-        return get_mock_prediction()
+        return get_mock_prediction(clinical_path, woods_path, temp_path)
+
+def generate_real_feature_maps(clinical_path, woods_path, temp_path):
+    """生成真实的特征图并保存到临时目录"""
+    feature_maps_urls = {}
+    temp_dir_name = os.path.basename(temp_path)
+
+    try:
+        # 处理临床图片
+        if clinical_path and os.path.exists(clinical_path):
+            clinical_features = extract_features_from_image(clinical_path, "clinical")
+            if clinical_features and clinical_features.get("overlay") is not None:
+                feature_filename = "clinical_feature.jpg"
+                save_path = os.path.join(temp_path, feature_filename)
+                cv2.imwrite(save_path, clinical_features["overlay"])
+                feature_maps_urls["clinical_feature"] = f"uploads/temp/{temp_dir_name}/{feature_filename}"
+        
+        # 处理伍德灯图片
+        if woods_path and os.path.exists(woods_path):
+            woods_features = extract_features_from_image(woods_path, "woods")
+            if woods_features and woods_features.get("overlay") is not None:
+                feature_filename = "woods_feature.jpg"
+                save_path = os.path.join(temp_path, feature_filename)
+                cv2.imwrite(save_path, woods_features["overlay"])
+                feature_maps_urls["woods_feature"] = f"uploads/temp/{temp_dir_name}/{feature_filename}"
+    
+    except Exception as e:
+        print(f"生成特征图失败: {e}")
+        return {}
+    
+    return feature_maps_urls
 
 def generate_analysis_details(clinical_tensor, woods_tensor, probabilities, image_type):
     """根据可用图片类型生成分析详情"""
@@ -176,22 +316,110 @@ def generate_analysis_details(clinical_tensor, woods_tensor, probabilities, imag
     
     return details
 
-def get_mock_prediction():
-    """当模型不可用时的模拟预测"""
-    return {
+def create_feature_overlay(original_img_path, gradient_map, image_type='clinical'):
+    """
+    根据原始图片和梯度图，生成高亮叠加图的 Base64 编码字符串。
+    """
+    if original_img_path is None or gradient_map is None:
+        return None
+
+    try:
+        original_img = cv2.imread(original_img_path)
+        if original_img is None:
+            return None
+
+        # 标准化梯度图到 0-255
+        gradient_map_normalized = cv2.normalize(gradient_map, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+
+        # 选择颜色映射
+        colormap = cv2.COLORMAP_HOT if image_type == 'clinical' else cv2.COLORMAP_COOL
+        heatmap_color = cv2.applyColorMap(gradient_map_normalized, colormap)
+
+        # 确保尺寸一致
+        if original_img.shape[:2] != heatmap_color.shape[:2]:
+            heatmap_color = cv2.resize(heatmap_color, (original_img.shape[1], original_img.shape[0]))
+
+        # 创建蒙版
+        _, mask = cv2.threshold(gradient_map_normalized, 5, 255, cv2.THRESH_BINARY)
+        mask_3channel = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+
+        # 混合图像
+        blended_img = cv2.addWeighted(original_img, 0.4, heatmap_color, 0.6, 0)
+        
+        # 应用蒙版
+        final_img = np.where(mask_3channel > 0, blended_img, original_img)
+
+        # 编码为 Base64
+        _, buffer = cv2.imencode('.jpg', final_img)
+        img_base64 = base64.b64encode(buffer).decode('utf-8')
+        
+        return f"data:image/jpeg;base64,{img_base64}"
+
+    except Exception as e:
+        print(f"创建特征覆盖图时出错: {e}")
+        return None
+
+def get_mock_prediction(clinical_path=None, woods_path=None, temp_path=None):
+    """
+    当模型不可用时的模拟预测。
+    如果提供了临床和伍德灯图片路径，则生成真实的特征图。
+    否则，返回模拟的特征图。
+    """
+    
+    feature_maps = {}
+    if temp_path:
+        temp_dir_name = os.path.basename(temp_path)
+        # --- 生成并编码特征图 ---
+        if clinical_path:
+            clinical_features_data = extract_woodlamp_edge_features(clinical_path)
+            if clinical_features_data and 'gradient_map' in clinical_features_data:
+                overlay_img = create_overlay_image(cv2.imread(clinical_path), clinical_features_data['gradient_map'])
+                if overlay_img is not None:
+                    feature_filename = "clinical_feature_mock.jpg"
+                    save_path = os.path.join(temp_path, feature_filename)
+                    cv2.imwrite(save_path, overlay_img)
+                    feature_maps["clinical_feature"] = f"uploads/temp/{temp_dir_name}/{feature_filename}"
+
+        if woods_path:
+            woods_features_data = extract_woodlamp_edge_features(woods_path)
+            if woods_features_data and 'gradient_map' in woods_features_data:
+                overlay_img = create_overlay_image(cv2.imread(woods_path), woods_features_data['gradient_map'])
+                if overlay_img is not None:
+                    feature_filename = "woods_feature_mock.jpg"
+                    save_path = os.path.join(temp_path, feature_filename)
+                    cv2.imwrite(save_path, overlay_img)
+                    feature_maps["woods_feature"] = f"uploads/temp/{temp_dir_name}/{feature_filename}"
+
+    # 完整结果
+    result = {
         "final_prediction": "进展期",
         "confidence": "99.5%",
+        "feature_maps": feature_maps,
         "details": [
-            {"prompt": "基于双图判断", "answer": "进展期"},
-            {"prompt": "仅根据伍德灯判断", "answer": "进展期"},
-            {"prompt": "仅根据临床图判断", "answer": "稳定期"},
-            {"prompt": "基于边缘特征图判断", "answer": "进展期"},
-            {"prompt": "选择题(A:进展, B:稳定)", "answer": "A"},
-            {"prompt": "模型注意力区域分析", "answer": "进展期"},
-            {"prompt": "历史数据对比", "answer": "进展期"},
-            {"prompt": "综合诊断意见", "answer": "进展期"}
+            {"prompt": "基于双图判断", "answer": "问答：进展期\n分类：进展期"},
+            {"prompt": "仅根据伍德灯判断", "answer": "问答：进展期\n分类：进展期"},
+            {"prompt": "仅根据临床图判断", "answer": "问答：稳定期\n分类：稳定期"},
+            {"prompt": "基于边缘特征图判断", "answer": "问答：进展期\n分类：进展期"},
+            {"prompt": "选择题(A:进展, B:稳定)", "answer": "问答：进展期\n分类：A"},
+            {"prompt": "模型注意力区域分析", "answer": "问答：进展期\n分类：进展期"},
+            {"prompt": "历史数据对比", "answer": "问答：进展期\n分类：进展期"},
+            {"prompt": "综合诊断意见", "answer": "问答：进展期\n分类：进展期"}
         ]
     }
+    
+    return result
+
+def determine_final_prediction(clinical_pred, woods_pred):
+    """
+    根据临床和伍德灯的预测概率，确定最终的预测结果。
+    """
+    # 假设临床预测是 [稳定概率, 进展概率]
+    # 伍德灯预测是 [稳定概率, 进展概率]
+    # 这里简单地取两者的最大概率作为最终预测
+    final_prob_active = max(clinical_pred[0][1], woods_pred[0][1])
+    final_prediction = "进展期" if final_prob_active > 0.5 else "稳定期"
+    return final_prediction, final_prob_active
+
 #@在python中，@app.route() 给函数绑定一个url地址，当用户访问这个url地址时，会执行这个函数
 @app.route('/')
 def index():
@@ -227,21 +455,22 @@ def predict():
         if has_woods and not woods_file.filename.lower().split('.')[-1] in allowed_extensions:
             return jsonify({'error': '伍德灯图片格式不支持，请上传图片文件'}), 400
         
-        # 保存上传的文件
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        clinical_path = None
-        woods_path = None
-        clinical_filename = None
-        woods_filename = None
-        
+        # 创建一个唯一的临时文件夹来存储本次请求的所有文件
+        temp_dir_name = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        temp_path = os.path.join(app.config['TEMP_FOLDER'], temp_dir_name)
+        os.makedirs(temp_path, exist_ok=True)
+
+        clinical_path, woods_path = None, None
+        clinical_filename, woods_filename = None, None
+
         if has_clinical:
-            clinical_filename = f"clinical_{timestamp}_{clinical_file.filename}"
-            clinical_path = os.path.join(app.config['UPLOAD_FOLDER'], clinical_filename)
+            clinical_filename = secure_filename(f"clinical_{clinical_file.filename}")
+            clinical_path = os.path.join(temp_path, clinical_filename)
             clinical_file.save(clinical_path)
             
         if has_woods:
-            woods_filename = f"woods_{timestamp}_{woods_file.filename}"
-            woods_path = os.path.join(app.config['UPLOAD_FOLDER'], woods_filename)
+            woods_filename = secure_filename(f"woods_{woods_file.filename}")
+            woods_path = os.path.join(temp_path, woods_filename)
             woods_file.save(woods_path)
         
         # 准备文件数据用于预测
@@ -256,17 +485,87 @@ def predict():
             with open(woods_path, 'rb') as wf:
                 woods_data = type('MockFile', (), {'read': lambda: wf.read()})()
         
-        # 进行AI预测（传入可能为None的参数）
-        result = predict_with_model(clinical_data, woods_data)
+        # 进行AI预测，现在传入temp_path以保存特征图
+        result = predict_with_model(clinical_data, woods_data, clinical_path, woods_path, temp_path)
         
-        # 记录预测日志
-        log_prediction(clinical_filename, woods_filename, result)
+        # 附加临时目录名和原始文件名到结果中
+        result['temp_dir_name'] = temp_dir_name
+        # result['original_files'] = {
+        #     'clinical_image': clinical_filename,
+        #     'woods_image': woods_filename,
+        # }
+
+        # 移除不再需要发送到前端的冗余信息
+        result.pop('files_to_save', None)
+
+        # 将最终结果保存到临时目录中的result.json
+        json_path = os.path.join(temp_path, 'result.json')
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(result, f, ensure_ascii=False, indent=4)
+        
+        # # 记录预测日志
+        # log_prediction(clinical_filename, woods_filename, result)
         
         return jsonify(result)
         
     except Exception as e:
         print(f"预测过程中发生错误: {e}")
         return jsonify({'error': f'预测失败: {str(e)}'}), 500
+
+@app.route('/save_result', methods=['POST'])
+def save_result():
+    """保存预测结果到带时间戳的文件夹"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': '无效的请求'}), 400
+
+        temp_dir_name = data.get('temp_dir_name')
+        if not temp_dir_name:
+            return jsonify({'error': '缺少临时目录名'}), 400
+
+        # 源路径：临时文件夹
+        temp_path = os.path.join(app.config['TEMP_FOLDER'], temp_dir_name)
+        if not os.path.isdir(temp_path):
+            return jsonify({'error': '临时结果不存在或已过期'}), 404
+
+        # 目标路径：永久保存的文件夹
+        timestamp_dir = datetime.now().strftime("%Y%m%d_%H%M%S")
+        save_path = os.path.join(app.config['UPLOAD_FOLDER'], timestamp_dir)
+        
+        # 移动文件夹
+        shutil.move(temp_path, save_path)
+            
+        return jsonify({'message': '结果保存成功', 'path': save_path})
+
+    except Exception as e:
+        print(f"保存结果时发生错误: {e}")
+        return jsonify({'error': f'保存失败: {str(e)}'}), 500
+
+
+@app.route('/uploads/<path:filename>')
+def uploaded_file(filename):
+    """提供上传的文件（支持子目录）"""
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+@app.route('/clear_temp', methods=['POST'])
+def clear_temp():
+    """清除指定的临时文件夹"""
+    try:
+        data = request.get_json()
+        temp_dir_name = data.get('temp_dir_name')
+        if not temp_dir_name:
+            return jsonify({'error': '缺少临时目录名'}), 400
+
+        temp_path = os.path.join(app.config['TEMP_FOLDER'], temp_dir_name)
+        if os.path.isdir(temp_path):
+            shutil.rmtree(temp_path)
+            return jsonify({'message': '临时文件已清除'})
+        else:
+            return jsonify({'message': '临时文件不存在，无需清除'})
+    except Exception as e:
+        print(f"清除临时文件时出错: {e}")
+        return jsonify({'error': f'清除失败: {str(e)}'}), 500
 
 def log_prediction(clinical_file, woods_file, result):
     """记录预测日志"""
