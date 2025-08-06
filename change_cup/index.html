@@ -709,7 +709,34 @@
             
             // 更新详细过程列表
             detailsList.innerHTML = ''; // 清空旧列表
-            data.details.forEach(item => {
+            
+            // 根据上传图片情况，过滤要显示的详细过程
+            let detailsToRender = data.details;
+            const hasBoth = file1 && file2;
+            const hasClinicalOnly = file1 && !file2;
+            const hasWoodsOnly = !file1 && file2;
+
+            if (hasBoth) {
+                // 两张图模式: 过滤掉单张图片的分析
+                detailsToRender = data.details.filter(item => {
+                    const prompt = item.prompt.toLowerCase();
+                    return !prompt.includes('仅根据');
+                });
+            } else if (hasClinicalOnly) {
+                // 仅临床图: 过滤掉伍德灯和双图的分析
+                detailsToRender = data.details.filter(item => {
+                    const prompt = item.prompt.toLowerCase();
+                    return !prompt.includes('伍德灯') && !prompt.includes('双图') && !prompt.includes('两图');
+                });
+            } else if (hasWoodsOnly) {
+                // 仅伍德灯: 过滤掉临床图和双图的分析
+                detailsToRender = data.details.filter(item => {
+                    const prompt = item.prompt.toLowerCase();
+                    return !prompt.includes('临床') && !prompt.includes('双图') && !prompt.includes('两图');
+                });
+            }
+
+            detailsToRender.forEach(item => {
                 const li = document.createElement('li');
                 
                 // 基本的文本内容 - 处理换行符

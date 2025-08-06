@@ -396,14 +396,24 @@ def get_mock_prediction(clinical_path=None, woods_path=None, temp_path=None):
         "confidence": "99.5%",
         "feature_maps": feature_maps,
         "details": [
-            {"prompt": "基于双图判断", "answer": "问答：进展期\n分类：进展期"},
-            {"prompt": "仅根据伍德灯判断", "answer": "问答：进展期\n分类：进展期"},
-            {"prompt": "仅根据临床图判断", "answer": "问答：稳定期\n分类：稳定期"},
-            {"prompt": "基于边缘特征图判断", "answer": "问答：进展期\n分类：进展期"},
-            {"prompt": "选择题(A:进展, B:稳定)", "answer": "问答：进展期\n分类：A"},
-            {"prompt": "模型注意力区域分析", "answer": "问答：进展期\n分类：进展期"},
-            {"prompt": "历史数据对比", "answer": "问答：进展期\n分类：进展期"},
-            {"prompt": "综合诊断意见", "answer": "问答：进展期\n分类：进展期"}
+            {"prompt": "双图prompt_1", "answer": "llm问答：进展期\nllm分类：进展期\ncnn分类：进展期"},
+            {"prompt": "双图prompt_2", "answer": "llm问答：进展期\nllm分类：进展期\ncnn分类：进展期"},
+            {"prompt": "双图prompt_3", "answer": "llm问答：进展期\nllm分类：进展期\ncnn分类：进展期"},
+            {"prompt": "双图prompt_4", "answer": "llm问答：进展期\nllm分类：进展期\ncnn分类：进展期"},
+            {"prompt": "双图prompt_5", "answer": "llm问答：进展期\nllm分类：进展期\ncnn分类：进展期"},
+            {"prompt": "双图prompt_6", "answer": "llm问答：进展期\nllm分类：进展期\ncnn分类：进展期"},
+            {"prompt": "仅根据伍德灯prompt_1", "answer": "llm问答：进展期\nllm分类：进展期\ncnn分类：稳定期"},
+            {"prompt": "仅根据伍德灯prompt_2", "answer": "llm问答：进展期\nllm分类：进展期\ncnn分类：稳定期"},
+            {"prompt": "仅根据伍德灯prompt_3", "answer": "llm问答：进展期\nllm分类：进展期\ncnn分类：稳定期"},
+            {"prompt": "仅根据伍德灯prompt_4", "answer": "llm问答：进展期\nllm分类：进展期\ncnn分类：稳定期"},
+            {"prompt": "仅根据伍德灯prompt_5", "answer": "llm问答：进展期\nllm分类：进展期\ncnn分类：稳定期"},
+            {"prompt": "仅根据伍德灯prompt_6", "answer": "llm问答：进展期\nllm分类：进展期\ncnn分类：稳定期"},
+            {"prompt": "仅根据临床prompt_1", "answer": "llm问答：稳定期\nllm分类：稳定期\ncnn分类：稳定期"},
+            {"prompt": "仅根据临床prompt_2", "answer": "llm问答：稳定期\nllm分类：稳定期\ncnn分类：稳定期"},
+            {"prompt": "仅根据临床prompt_3", "answer": "llm问答：稳定期\nllm分类：稳定期\ncnn分类：稳定期"},
+            {"prompt": "仅根据临床prompt_4", "answer": "llm问答：稳定期\nllm分类：稳定期\ncnn分类：稳定期"},
+            {"prompt": "仅根据临床prompt_5", "answer": "llm问答：稳定期\nllm分类：稳定期\ncnn分类：稳定期"},
+            {"prompt": "仅根据临床prompt_6", "answer": "llm问答：稳定期\nllm分类：稳定期\ncnn分类：稳定期"},
         ]
     }
     

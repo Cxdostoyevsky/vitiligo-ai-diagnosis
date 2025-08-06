@@ -1,0 +1,82 @@
+{
+    "final_prediction": "进展期",
+    "confidence": "99.5%",
+    "feature_maps": {
+        "clinical_feature": "uploads/temp/20250807_001440_823458/clinical_feature.jpg"
+    },
+    "details": [
+        {
+            "prompt": "双图prompt_1",
+            "answer": "llm问答：进展期\nllm分类：进展期\ncnn分类：进展期"
+        },
+        {
+            "prompt": "双图prompt_2",
+            "answer": "llm问答：进展期\nllm分类：进展期\ncnn分类：进展期"
+        },
+        {
+            "prompt": "双图prompt_3",
+            "answer": "llm问答：进展期\nllm分类：进展期\ncnn分类：进展期"
+        },
+        {
+            "prompt": "双图prompt_4",
+            "answer": "llm问答：进展期\nllm分类：进展期\ncnn分类：进展期"
+        },
+        {
+            "prompt": "双图prompt_5",
+            "answer": "llm问答：进展期\nllm分类：进展期\ncnn分类：进展期"
+        },
+        {
+            "prompt": "双图prompt_6",
+            "answer": "llm问答：进展期\nllm分类：进展期\ncnn分类：进展期"
+        },
+        {
+            "prompt": "仅根据伍德灯prompt_1",
+            "answer": "llm问答：进展期\nllm分类：进展期\ncnn分类：稳定期"
+        },
+        {
+            "prompt": "仅根据伍德灯prompt_2",
+            "answer": "llm问答：进展期\nllm分类：进展期\ncnn分类：稳定期"
+        },
+        {
+            "prompt": "仅根据伍德灯prompt_3",
+            "answer": "llm问答：进展期\nllm分类：进展期\ncnn分类：稳定期"
+        },
+        {
+            "prompt": "仅根据伍德灯prompt_4",
+            "answer": "llm问答：进展期\nllm分类：进展期\ncnn分类：稳定期"
+        },
+        {
+            "prompt": "仅根据伍德灯prompt_5",
+            "answer": "llm问答：进展期\nllm分类：进展期\ncnn分类：稳定期"
+        },
+        {
+            "prompt": "仅根据伍德灯prompt_6",
+            "answer": "llm问答：进展期\nllm分类：进展期\ncnn分类：稳定期"
+        },
+        {
+            "prompt": "仅根据临床prompt_1",
+            "answer": "llm问答：稳定期\nllm分类：稳定期\ncnn分类：稳定期"
+        },
+        {
+            "prompt": "仅根据临床prompt_2",
+            "answer": "llm问答：稳定期\nllm分类：稳定期\ncnn分类：稳定期"
+        },
+        {
+            "prompt": "仅根据临床prompt_3",
+            "answer": "llm问答：稳定期\nllm分类：稳定期\ncnn分类：稳定期"
+        },
+        {
+            "prompt": "仅根据临床prompt_4",
+            "answer": "llm问答：稳定期\nllm分类：稳定期\ncnn分类：稳定期"
+        },
+        {
+            "prompt": "仅根据临床prompt_5",
+            "answer": "llm问答：稳定期\nllm分类：稳定期\ncnn分类：稳定期"
+        },
+        {
+            "prompt": "仅根据临床prompt_6",
+            "answer": "llm问答：稳定期\nllm分类：稳定期\ncnn分类：稳定期"
+        }
+    ],
+    "temp_dir_name": "20250807_001440_823458"
+}
