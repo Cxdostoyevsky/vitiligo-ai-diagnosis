@@ -14,6 +14,7 @@ import cv2
 import sys
 from werkzeug.utils import secure_filename
 from Feature_extran_vis_tools.feature_extractor import extract_woodlamp_edge_features
+from Feature_extran_vis_tools.create_highlight_overlays import create_overlay_image
 import shutil
 
 
@@ -53,85 +54,6 @@ def cv2_to_base64(img_array, img_format='PNG'):
         return f"data:image/{img_format.lower()};base64,{img_base64}"
     except Exception as e:
         print(f"图像转base64失败: {e}")
-        return None
-
-def create_feature_heatmap(gradient_map, colormap=cv2.COLORMAP_JET):
-    """创建特征热力图"""
-    try:
-        # 归一化梯度图到0-255范围
-        normalized = cv2.normalize(gradient_map, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-        # 应用颜色映射
-        heatmap = cv2.applyColorMap(normalized, colormap)
-        return heatmap
-    except Exception as e:
-        print(f"创建热力图失败: {e}")
-        return None
-
-def create_overlay_image(original_img, gradient_map, alpha=0.6):
-    """创建叠加图像"""
-    try:
-        # 创建热力图
-        heatmap = create_feature_heatmap(gradient_map)
-        if heatmap is None:
-            return original_img
-            
-        # 确保尺寸匹配
-        if original_img.shape[:2] != heatmap.shape[:2]:
-            heatmap = cv2.resize(heatmap, (original_img.shape[1], original_img.shape[0]))
-        
-        # 创建阈值蒙版，只高亮显著特征区域
-        threshold = 20  # 可以调整这个值
-        _, mask = cv2.threshold(cv2.cvtColor(heatmap, cv2.COLOR_BGR2GRAY), threshold, 255, cv2.THRESH_BINARY)
-        mask_3channel = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
-        
-        # 叠加图像
-        blended = cv2.addWeighted(original_img, 1-alpha, heatmap, alpha, 0)
-        # 只在有特征的区域显示叠加效果
-        overlay = np.where(mask_3channel > 0, blended, original_img)
-        
-        return overlay
-    except Exception as e:
-        print(f"创建叠加图失败: {e}")
-        return original_img
-
-def extract_features_from_image(image_path, image_type="clinical"):
-    """从图像中提取特征并生成可视化图像"""
-    try:
-        # 使用特征提取器
-        result = extract_woodlamp_edge_features(image_path)
-        if result is None:
-            return None
-            
-        features = result.get("features", {})
-        gradient_map = result.get("gradient_map")
-        
-        if gradient_map is None:
-            return None
-            
-        # 读取原始图像
-        original_img = cv2.imread(image_path)
-        if original_img is None:
-            return None
-            
-        # 根据图像类型选择颜色映射
-        colormap = cv2.COLORMAP_HOT if image_type == "clinical" else cv2.COLORMAP_COOL
-        
-        # 创建热力图
-        heatmap = create_feature_heatmap(gradient_map, colormap)
-        
-        # 创建叠加图
-        overlay = create_overlay_image(original_img, gradient_map)
-        
-        return {
-            "features": features,
-            "gradient_map": gradient_map,
-            "heatmap": heatmap,
-            "overlay": overlay,
-            "original": original_img
-        }
-        
-    except Exception as e:
-        print(f"特征提取失败: {e}")
         return None
 
 def load_model():
@@ -219,7 +141,35 @@ def predict_with_model(clinical_img=None, woods_img=None, clinical_path=None, wo
                 confidence_percent = f"{adjusted_confidence * 100:.1f}%"
             
             # 生成真实特征图并保存到临时目录
-            feature_maps = generate_real_feature_maps(clinical_path, woods_path, temp_path)
+            feature_maps = {}
+            if temp_path:
+                temp_dir_name = os.path.basename(temp_path)
+                # --- 生成并编码特征图 ---
+                if clinical_path:
+                    clinical_features_data = extract_woodlamp_edge_features(clinical_path)
+                    if clinical_features_data and 'gradient_map' in clinical_features_data:
+                        gradient_map = clinical_features_data['gradient_map']
+                        # 修正: 将CV_64F转换为CV_8U
+                        gradient_map_normalized = cv2.normalize(gradient_map, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+                        overlay_img = create_overlay_image(clinical_path, gradient_map_normalized, image_type='clinical')
+                        if overlay_img is not None:
+                            feature_filename = "clinical_feature.jpg"
+                            save_path = os.path.join(temp_path, feature_filename)
+                            cv2.imwrite(save_path, overlay_img)
+                            feature_maps["clinical_feature"] = f"uploads/temp/{temp_dir_name}/{feature_filename}"
+
+                if woods_path:
+                    woods_features_data = extract_woodlamp_edge_features(woods_path)
+                    if woods_features_data and 'gradient_map' in woods_features_data:
+                        gradient_map = woods_features_data['gradient_map']
+                        # 修正: 将CV_64F转换为CV_8U
+                        gradient_map_normalized = cv2.normalize(gradient_map, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+                        overlay_img = create_overlay_image(woods_path, gradient_map_normalized, image_type='wood_lamp')
+                        if overlay_img is not None:
+                            feature_filename = "woods_feature.jpg"
+                            save_path = os.path.join(temp_path, feature_filename)
+                            cv2.imwrite(save_path, overlay_img)
+                            feature_maps["woods_feature"] = f"uploads/temp/{temp_dir_name}/{feature_filename}"
             
             # 生成详细分析过程
             details = generate_analysis_details(clinical_tensor, woods_tensor, probabilities, image_type)
@@ -239,36 +189,6 @@ def predict_with_model(clinical_img=None, woods_img=None, clinical_path=None, wo
     except Exception as e:
         print(f"模型预测失败: {e}")
         return get_mock_prediction(clinical_path, woods_path, temp_path)
-
-def generate_real_feature_maps(clinical_path, woods_path, temp_path):
-    """生成真实的特征图并保存到临时目录"""
-    feature_maps_urls = {}
-    temp_dir_name = os.path.basename(temp_path)
-
-    try:
-        # 处理临床图片
-        if clinical_path and os.path.exists(clinical_path):
-            clinical_features = extract_features_from_image(clinical_path, "clinical")
-            if clinical_features and clinical_features.get("overlay") is not None:
-                feature_filename = "clinical_feature.jpg"
-                save_path = os.path.join(temp_path, feature_filename)
-                cv2.imwrite(save_path, clinical_features["overlay"])
-                feature_maps_urls["clinical_feature"] = f"uploads/temp/{temp_dir_name}/{feature_filename}"
-        
-        # 处理伍德灯图片
-        if woods_path and os.path.exists(woods_path):
-            woods_features = extract_features_from_image(woods_path, "woods")
-            if woods_features and woods_features.get("overlay") is not None:
-                feature_filename = "woods_feature.jpg"
-                save_path = os.path.join(temp_path, feature_filename)
-                cv2.imwrite(save_path, woods_features["overlay"])
-                feature_maps_urls["woods_feature"] = f"uploads/temp/{temp_dir_name}/{feature_filename}"
-    
-    except Exception as e:
-        print(f"生成特征图失败: {e}")
-        return {}
-    
-    return feature_maps_urls
 
 def generate_analysis_details(clinical_tensor, woods_tensor, probabilities, image_type):
     """根据可用图片类型生成分析详情"""
@@ -316,49 +236,6 @@ def generate_analysis_details(clinical_tensor, woods_tensor, probabilities, imag
     
     return details
 
-def create_feature_overlay(original_img_path, gradient_map, image_type='clinical'):
-    """
-    根据原始图片和梯度图，生成高亮叠加图的 Base64 编码字符串。
-    """
-    if original_img_path is None or gradient_map is None:
-        return None
-
-    try:
-        original_img = cv2.imread(original_img_path)
-        if original_img is None:
-            return None
-
-        # 标准化梯度图到 0-255
-        gradient_map_normalized = cv2.normalize(gradient_map, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
-
-        # 选择颜色映射
-        colormap = cv2.COLORMAP_HOT if image_type == 'clinical' else cv2.COLORMAP_COOL
-        heatmap_color = cv2.applyColorMap(gradient_map_normalized, colormap)
-
-        # 确保尺寸一致
-        if original_img.shape[:2] != heatmap_color.shape[:2]:
-            heatmap_color = cv2.resize(heatmap_color, (original_img.shape[1], original_img.shape[0]))
-
-        # 创建蒙版
-        _, mask = cv2.threshold(gradient_map_normalized, 5, 255, cv2.THRESH_BINARY)
-        mask_3channel = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
-
-        # 混合图像
-        blended_img = cv2.addWeighted(original_img, 0.4, heatmap_color, 0.6, 0)
-        
-        # 应用蒙版
-        final_img = np.where(mask_3channel > 0, blended_img, original_img)
-
-        # 编码为 Base64
-        _, buffer = cv2.imencode('.jpg', final_img)
-        img_base64 = base64.b64encode(buffer).decode('utf-8')
-        
-        return f"data:image/jpeg;base64,{img_base64}"
-
-    except Exception as e:
-        print(f"创建特征覆盖图时出错: {e}")
-        return None
-
 def get_mock_prediction(clinical_path=None, woods_path=None, temp_path=None):
     """
     当模型不可用时的模拟预测。
@@ -373,7 +250,10 @@ def get_mock_prediction(clinical_path=None, woods_path=None, temp_path=None):
         if clinical_path:
             clinical_features_data = extract_woodlamp_edge_features(clinical_path)
             if clinical_features_data and 'gradient_map' in clinical_features_data:
-                overlay_img = create_overlay_image(cv2.imread(clinical_path), clinical_features_data['gradient_map'])
+                gradient_map = clinical_features_data['gradient_map']
+                # 修正: 将CV_64F转换为CV_8U
+                gradient_map_normalized = cv2.normalize(gradient_map, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+                overlay_img = create_overlay_image(clinical_path, gradient_map_normalized, image_type='clinical')
                 if overlay_img is not None:
                     feature_filename = "clinical_feature.jpg"
                     save_path = os.path.join(temp_path, feature_filename)
@@ -383,7 +263,10 @@ def get_mock_prediction(clinical_path=None, woods_path=None, temp_path=None):
         if woods_path:
             woods_features_data = extract_woodlamp_edge_features(woods_path)
             if woods_features_data and 'gradient_map' in woods_features_data:
-                overlay_img = create_overlay_image(cv2.imread(woods_path), woods_features_data['gradient_map'])
+                gradient_map = woods_features_data['gradient_map']
+                # 修正: 将CV_64F转换为CV_8U
+                gradient_map_normalized = cv2.normalize(gradient_map, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+                overlay_img = create_overlay_image(woods_path, gradient_map_normalized, image_type='wood_lamp')
                 if overlay_img is not None:
                     feature_filename = "woods_feature.jpg"
                     save_path = os.path.join(temp_path, feature_filename)

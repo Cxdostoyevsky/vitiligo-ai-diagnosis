@@ -2,8 +2,8 @@
     "final_prediction": "进展期",
     "confidence": "99.5%",
     "feature_maps": {
-        "clinical_feature": "uploads/temp/20250806_235007_065441/clinical_feature.jpg",
-        "woods_feature": "uploads/temp/20250806_235007_065441/woods_feature.jpg"
+        "clinical_feature": "uploads/temp/20250807_223822_328011/clinical_feature.jpg",
+        "woods_feature": "uploads/temp/20250807_223822_328011/woods_feature.jpg"
     },
     "details": [
         {
@@ -79,5 +79,5 @@
             "answer": "llm问答：稳定期\nllm分类：稳定期\ncnn分类：稳定期"
         }
     ],
-    "temp_dir_name": "20250806_235007_065441"
+    "temp_dir_name": "20250807_223822_328011"
 }
