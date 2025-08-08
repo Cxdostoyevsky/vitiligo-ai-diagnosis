@@ -97,10 +97,10 @@ def preprocess_image(image_file):
         print(f"图像预处理失败: {e}")
         return None
 
-def predict_with_model(clinical_img=None, woods_img=None, clinical_path=None, woods_path=None, temp_path=None):
+def predict_with_model(clinical_img=None, woods_img=None, clinical_path=None, woods_path=None, temp_path=None, doot_dir=None):
     """使用真实模型进行预测，支持单张或双张图片"""
     if model is None:
-        return get_mock_prediction(clinical_path, woods_path, temp_path)
+        return get_mock_prediction(clinical_path, woods_path, temp_path, doot_dir)
     
     try:
         with torch.no_grad():
@@ -275,7 +275,7 @@ def generate_analysis_details(clinical_tensor, woods_tensor, probabilities, imag
     
     return details
 
-def get_mock_prediction(clinical_path=None, woods_path=None, temp_path=None):
+def get_mock_prediction(clinical_path=None, woods_path=None, temp_path=None, doot_dir=None):
     """
     当模型不可用时的模拟预测。
     如果提供了临床和伍德灯图片路径，则生成真实的特征图。
@@ -294,7 +294,7 @@ def get_mock_prediction(clinical_path=None, woods_path=None, temp_path=None):
                 gradient_map_normalized = cv2.normalize(gradient_map, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
                 overlay_img = create_overlay_image(clinical_path, gradient_map_normalized, image_type='clinical')
                 if overlay_img is not None:
-                    feature_filename = "clinical_feature.jpg"
+                    feature_filename = "edge_enhanced_clinical.jpg"
                     save_path = os.path.join(temp_path, feature_filename)
                     cv2.imwrite(save_path, overlay_img)
                     feature_maps["clinical_feature"] = f"uploads/temp/{temp_dir_name}/{feature_filename}"
@@ -307,7 +307,7 @@ def get_mock_prediction(clinical_path=None, woods_path=None, temp_path=None):
                 gradient_map_normalized = cv2.normalize(gradient_map, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
                 overlay_img = create_overlay_image(woods_path, gradient_map_normalized, image_type='wood_lamp')
                 if overlay_img is not None:
-                    feature_filename = "woods_feature.jpg"
+                    feature_filename = "edge_enhanced_woods.jpg"
                     save_path = os.path.join(temp_path, feature_filename)
                     cv2.imwrite(save_path, overlay_img)
                     feature_maps["woods_feature"] = f"uploads/temp/{temp_dir_name}/{feature_filename}"
@@ -328,8 +328,8 @@ def get_mock_prediction(clinical_path=None, woods_path=None, temp_path=None):
                 "status": status_prediction,
                 "patient_id": patient_id,
                 "images": {
-                    "clinical": [os.path.basename(clinical_path)] if clinical_path else [],
-                    "wood_lamp": [os.path.basename(woods_path)] if woods_path else []
+                    "clinical": [os.path.basename(clinical_path).split('_')[-1]] if clinical_path else [],
+                    "wood_lamp": [os.path.basename(woods_path).split('_')[-1]] if woods_path else []
                 }
             }
             
@@ -337,8 +337,8 @@ def get_mock_prediction(clinical_path=None, woods_path=None, temp_path=None):
             with open(master_json_path, 'w', encoding='utf-8') as f:
                 json.dump([master_case_data], f, indent=2, ensure_ascii=False)
 
-            two_binary_cls(master_json_path, temp_path)
-            two_choice(master_json_path, temp_path)
+            two_binary_cls(master_json_path, temp_path, doot_dir)
+            two_choice(master_json_path, temp_path, doot_dir)
 
             print(f"模拟预测：成功通过外部脚本在 {temp_path} 生成数据集文件。")
             
@@ -423,18 +423,19 @@ def predict():
         # 创建一个唯一的临时文件夹来存储本次请求的所有文件
         temp_dir_name = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         temp_path = os.path.join(app.config['TEMP_FOLDER'], temp_dir_name)
+        doot_dir = temp_dir_name
         os.makedirs(temp_path, exist_ok=True)
 
         clinical_path, woods_path = None, None
         clinical_filename, woods_filename = None, None
 
         if has_clinical:
-            clinical_filename = secure_filename(f"clinical.{clinical_file.filename.lower().split('.')[-1]}") #secure_filename: 确保文件名安全，防止被hacker恶意文件名攻击
+            clinical_filename = secure_filename(f"original_clinical.{clinical_file.filename.lower().split('.')[-1]}") #secure_filename: 确保文件名安全，防止被hacker恶意文件名攻击
             clinical_path = os.path.join(temp_path, clinical_filename)
             clinical_file.save(clinical_path)
             
         if has_woods:
-            woods_filename = secure_filename(f"woods.{woods_file.filename.lower().split('.')[-1]}")
+            woods_filename = secure_filename(f"original_woods.{woods_file.filename.lower().split('.')[-1]}")
             woods_path = os.path.join(temp_path, woods_filename)
             woods_file.save(woods_path)
         
@@ -451,7 +452,7 @@ def predict():
                 woods_data = type('MockFile', (), {'read': lambda: wf.read()})()
         
         # 进行AI预测，现在传入temp_path以保存特征图
-        result = predict_with_model(clinical_data, woods_data, clinical_path, woods_path, temp_path)
+        result = predict_with_model(clinical_data, woods_data, clinical_path, woods_path, temp_path, doot_dir)
         
         # 附加临时目录名和原始文件名到结果中
         result['temp_dir_name'] = temp_dir_name
@@ -489,8 +490,8 @@ def save_result():
             return jsonify({'error': '临时结果不存在或已过期'}), 404
 
         # 目标路径：永久保存的文件夹
-        timestamp_dir = datetime.now().strftime("%Y%m%d_%H%M%S")
-        save_path = os.path.join(app.config['UPLOAD_FOLDER'], timestamp_dir)
+        # timestamp_dir = datetime.now().strftime("%Y%m%d_%H%M%S")
+        save_path = os.path.join(app.config['UPLOAD_FOLDER'], temp_dir_name)
         
         # 移动文件夹
         shutil.move(temp_path, save_path)
@@ -573,7 +574,7 @@ if __name__ == '__main__':
     
     # 启动服务
     print("服务启动中...")
-    print("访问地址: http://localhost:8080")
-    print("API接口: http://localhost:8080/predict")
+    print("访问地址: http://localhost:8888")
+    print("API接口: http://localhost:8888/predict")
     #这里只是启动服务器，具体的执行是在http请求中执行的
     app.run(debug=True, host='0.0.0.0', port=8080) #debug=true:代码改动时自动重启服务器，host='0.0.0.0':监听所有网络接口，允许外部访问，port=8080:端口号

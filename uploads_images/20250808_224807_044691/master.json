@@ -1,0 +1,15 @@
+[
+  {
+    "idx": 0,
+    "status": "active_stage",
+    "patient_id": "patient_20250808_224807_044691",
+    "images": {
+      "clinical": [
+        "clinical.jpeg"
+      ],
+      "wood_lamp": [
+        "woods.png"
+      ]
+    }
+  }
+]

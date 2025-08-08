@@ -69,7 +69,7 @@ def generate_prompt(image_permutation):
     return (f"Based on the input of {img_desc}, analyze and determine the vitiligo "
             f"progression phase: stable stage vitiligo or active stage vitiligo?")
 
-def create_dataset_for_permutation(master_data, permutation, output_path):
+def create_dataset_for_permutation(master_data, permutation, output_path, doot_dir):
     """为一种特定的图片排列组合生成一个完整的数据集文件。"""
     new_dataset = []
     prompt_template = generate_prompt(permutation)
@@ -79,9 +79,24 @@ def create_dataset_for_permutation(master_data, permutation, output_path):
         num_images_in_case = len(case['images']['clinical'])
         for i in range(num_images_in_case):
             image_paths = []
+            
+            # 检查这个案例是否包含所有需要的图片类型
+            missing_image = False
+            for img_type in permutation:
+                if not case['images'][img_type['key']]:
+                    missing_image = True
+                    break
+            
+            # 如果有任何一种图片缺失，就跳过这个案例
+            if missing_image:
+                continue
+
             for img_type in permutation:
                 relative_path = case['images'][img_type['key']][i]
-                final_path = os.path.join(img_type['prefix'], relative_path)
+                base_name = os.path.basename(relative_path)
+                #将base_name和img_type['prefix']连接起来
+                final_path = img_type['prefix'] + "_" + base_name
+                final_path = os.path.join(doot_dir, final_path)
                 image_paths.append(final_path)
 
             gpt_response = f"{case['status'].replace('_', ' ')} vitiligo"
@@ -98,12 +113,15 @@ def create_dataset_for_permutation(master_data, permutation, output_path):
             }
             new_dataset.append(new_entry)
             conversation_id += 1
-            
+    #假如数据集为空，则不生成数据集
+    if len(new_dataset) == 0:
+        return
+    
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(new_dataset, f, indent=2, ensure_ascii=False)
 
 
-def two_binary_cls(master_json_path, output_dir):
+def two_binary_cls(master_json_path, output_dir, doot_dir):
     """主函数，执行所有操作。"""
     
     if not os.path.exists(master_json_path):
@@ -150,7 +168,7 @@ def two_binary_cls(master_json_path, output_dir):
         output_filename = f'train_binary_cls_{k}img_{filename_initials_part}.json'
         output_filepath = os.path.join(output_dir, output_filename)
         
-        create_dataset_for_permutation(master_data, perm, output_filepath)
+        create_dataset_for_permutation(master_data, perm, output_filepath, doot_dir)
         
         print(f"  - 已生成: {output_filename}")
         dataset_counter += 1

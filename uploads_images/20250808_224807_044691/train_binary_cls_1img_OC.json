@@ -1,0 +1,14 @@
+[
+  {
+    "id": 0,
+    "conversations": [
+      {
+        "from": "human",
+        "value": "Based on the input of the original clinical image <image>, analyze and determine the vitiligo progression phase: stable stage vitiligo or active stage vitiligo?"
+      }
+    ],
+    "image": [
+      "20250808_224807_044691/original_clinical.jpeg"
+    ]
+  }
+]

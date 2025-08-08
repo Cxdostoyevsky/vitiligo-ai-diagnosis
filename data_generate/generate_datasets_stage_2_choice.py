@@ -77,16 +77,31 @@ def generate_mcq_prompt(image_permutation, option_a_text, option_b_text):
     return question
 
 
-def create_multiple_choice_dataset(master_data, permutation, output_path):
+def create_multiple_choice_dataset(master_data, permutation, output_path, doot_dir):
     """Creates a complete multiple-choice dataset for a specific permutation."""
     
     labeled_samples = []
     for case in master_data:
         for i in range(len(case['images']['clinical'])):
             image_paths = []
+            
+            # 检查这个案例是否包含所有需要的图片类型
+            missing_image = False
+            for img_type in permutation:
+                if not case['images'][img_type['key']]:
+                    missing_image = True
+                    break
+            
+            # 如果有任何一种图片缺失，就跳过这个案例
+            if missing_image:
+                continue
+            
             for img_type in permutation:
                 relative_path = case['images'][img_type['key']][i]
-                final_path = os.path.join(img_type['prefix'], relative_path)
+                base_name = os.path.basename(relative_path) 
+                #将base_name和img_type['prefix']连接起来
+                final_path = img_type['prefix'] + "_" + base_name
+                final_path = os.path.join(doot_dir, final_path)
                 image_paths.append(final_path)
             
             labeled_samples.append({
@@ -129,11 +144,15 @@ def create_multiple_choice_dataset(master_data, permutation, output_path):
         new_dataset.append(new_entry)
 
     random.shuffle(new_dataset)
+    #假如没有图片，则不生成数据集        
+    if len(new_dataset) == 0:
+        return
+    
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(new_dataset, f, indent=2, ensure_ascii=False)
 
 
-def two_choice(master_json_path, output_dir):
+def two_choice(master_json_path, output_dir, doot_dir):
     """主函数，根据指定的6种组合生成选择题数据集。"""
     
     if not os.path.exists(master_json_path):
@@ -181,7 +200,7 @@ def two_choice(master_json_path, output_dir):
         output_filepath = os.path.join(output_dir, output_filename)
         
         # 调用选择题数据集的生成函数
-        create_multiple_choice_dataset(master_data, perm, output_filepath)
+        create_multiple_choice_dataset(master_data, perm, output_filepath, doot_dir)
         
         print(f"  - Generated: {output_filename}")
         dataset_counter += 1
