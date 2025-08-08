@@ -12,11 +12,14 @@ import numpy as np
 from datetime import datetime
 import cv2
 import sys
+import random
 from werkzeug.utils import secure_filename
 from Feature_extran_vis_tools.feature_extractor import extract_woodlamp_edge_features
 from Feature_extran_vis_tools.create_highlight_overlays import create_overlay_image
+from data_generate.generate_datasets_stage_2_binary_cls import two_binary_cls
+from data_generate.generate_datasets_stage_2_choice import two_choice
 import shutil
-
+import subprocess
 
 app = Flask(__name__)  #flask相当于盖房子的图纸,app是图纸的实例,之后的所有代码都是基于这个实例的，比如注册网址，配置参数等
 CORS(app)  # 允许跨域请求，允许和来自不同地方的前端页面进行通信，比如前端页面在localhost:3000，后端在localhost:8080，前端页面可以访问后端
@@ -171,6 +174,42 @@ def predict_with_model(clinical_img=None, woods_img=None, clinical_path=None, wo
                             cv2.imwrite(save_path, overlay_img)
                             feature_maps["woods_feature"] = f"uploads/temp/{temp_dir_name}/{feature_filename}"
             
+            # === 生成数据集文件 ===
+            try:
+                # 确定预测状态（将中文转换为英文状态标识）
+                status_prediction = "active_stage" if prediction == "进展期" else "stable_stage"
+                
+                # 生成唯一的patient_id
+                patient_id = f"patient_{temp_dir_name}"
+                
+                # 1. 创建临时的master.json文件
+                master_case_data = {
+                    "idx": 0,
+                    "status": status_prediction,
+                    "patient_id": patient_id,
+                    "images": {
+                        "clinical": [os.path.basename(clinical_path)] if clinical_path else [],
+                        "wood_lamp": [os.path.basename(woods_path)] if woods_path else []
+                    }
+                }
+                
+                master_json_path = os.path.join(temp_path, 'master.json')
+                with open(master_json_path, 'w', encoding='utf-8') as f:
+                    json.dump([master_case_data], f, indent=2, ensure_ascii=False)
+
+                # 2. 调用外部脚本生成数据集
+                script_path = os.path.join('data_generate', 'generate_datasets_stage_2_binary_cls.py')
+                subprocess.run([
+                    sys.executable, script_path,
+                    '--master_json', master_json_path,
+                    '--output_dir', temp_path
+                ], check=True)
+
+                print(f"成功通过外部脚本在 {temp_path} 生成数据集文件。")
+
+            except Exception as e:
+                print(f"通过外部脚本生成数据集时出错: {e}")
+            
             # 生成详细分析过程
             details = generate_analysis_details(clinical_tensor, woods_tensor, probabilities, image_type)
             
@@ -272,6 +311,39 @@ def get_mock_prediction(clinical_path=None, woods_path=None, temp_path=None):
                     save_path = os.path.join(temp_path, feature_filename)
                     cv2.imwrite(save_path, overlay_img)
                     feature_maps["woods_feature"] = f"uploads/temp/{temp_dir_name}/{feature_filename}"
+
+    # === 生成数据集文件 ===
+    if temp_path:
+        try:
+            # 模拟预测状态为进展期
+            status_prediction = "active_stage"
+            
+            # 生成唯一的patient_id
+            temp_dir_name = os.path.basename(temp_path)
+            patient_id = f"patient_{temp_dir_name}"
+            
+            # 1. 创建临时的master.json文件
+            master_case_data = {
+                "idx": 0,
+                "status": status_prediction,
+                "patient_id": patient_id,
+                "images": {
+                    "clinical": [os.path.basename(clinical_path)] if clinical_path else [],
+                    "wood_lamp": [os.path.basename(woods_path)] if woods_path else []
+                }
+            }
+            
+            master_json_path = os.path.join(temp_path, 'master.json')
+            with open(master_json_path, 'w', encoding='utf-8') as f:
+                json.dump([master_case_data], f, indent=2, ensure_ascii=False)
+
+            two_binary_cls(master_json_path, temp_path)
+            two_choice(master_json_path, temp_path)
+
+            print(f"模拟预测：成功通过外部脚本在 {temp_path} 生成数据集文件。")
+            
+        except Exception as e:
+            print(f"模拟预测通过外部脚本生成数据集时出错: {e}")
 
     # 完整结果
     result = {
