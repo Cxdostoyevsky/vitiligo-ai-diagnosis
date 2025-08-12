@@ -52,6 +52,7 @@
             display: flex;
             gap: 2rem;
             flex-wrap: wrap;
+            align-items: stretch; /* 新增：确保两列等高 */
         }
 
         /* --- 输入端样式 --- */
@@ -70,7 +71,11 @@
             margin-bottom: 1.5rem;
             font-size: 1.25rem;
         }
-
+        
+        .output-section > h2 {
+            width: 100%;
+        }
+        
         .upload-area {
             display: flex;
             justify-content: space-around;
@@ -97,7 +102,8 @@
 
         .upload-box {
             width: 100%;
-            height: 250px;
+            /* height: 250px; */
+            padding-top: 56.25%; /* 16:9 Aspect Ratio */
             border: 2px dashed var(--border-color);
             border-radius: 8px;
             display: flex;
@@ -128,6 +134,11 @@
         }
         
         .upload-prompt {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
             text-align: center;
         }
         
@@ -176,9 +187,10 @@
         .output-section {
             display: flex;
             flex-direction: column;
-            justify-content: center;
-            align-items: center;
+            /* justify-content: flex-start; */ /* 删除此行，让内容自由对齐 */
+            align-items: stretch;
             min-height: 400px;
+            position: relative; /* 添加相对定位，作为内部绝对定位元素的基准 */
         }
 
         #result-container {
@@ -188,6 +200,12 @@
         
         .result-placeholder {
             color: #6c757d;
+            position: absolute; /* 改为绝对定位 */
+            top: 50%; /* 垂直居中 */
+            left: 50%; /* 水平居中 */
+            transform: translate(-50%, -50%); /* 精确居中 */
+            text-align: center; /* 文本居中 */
+            width: 90%; /* 避免文本过长换行 */
         }
 
         .result-title {
@@ -262,6 +280,12 @@
            background-color: #c82333;
        }
        
+       .input-actions { /* 新增：包裹所有操作按钮的容器 */
+           display: flex;
+           flex-direction: column;
+           gap: 0.75rem; /* 设置统一间距 */
+       }
+
        #save-status {
             text-align: center;
             font-size: 0.9rem;
@@ -269,12 +293,24 @@
             font-weight: 500;
        }
 
+       /* 新增: 为了让保存状态信息与按钮组有间距 */
+       .result-actions {
+           margin-top: 0.5rem;
+           text-align: center;
+       }
+
+
         /* --- 详细过程视图 --- */
         #details-view {
             width: 100%;
-            margin-top: 1.5rem;
+            margin-top: 2rem;
             border-top: 1px solid var(--border-color);
-            padding-top: 1.5rem;
+            padding: 2rem;
+            transition: all 0.5s ease-in-out;
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            box-sizing: border-box;
         }
 
         #details-view h3 {
@@ -286,13 +322,34 @@
             list-style: none;
             padding: 0;
             margin: 0;
-            max-height: 200px;
+            max-height: 450px; /* 从200px增加到450px */
             overflow-y: auto;
+            padding-right: 0.5rem; /* 为滚动条留出空间 */
+        }
+
+        /* 新增：美化滚动条 */
+        .details-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .details-list::-webkit-scrollbar-track {
+            background: var(--bg-color);
+            border-radius: 4px;
+        }
+
+        .details-list::-webkit-scrollbar-thumb {
+            background-color: #d4d4d4;
+            border-radius: 4px;
+            border: 2px solid var(--bg-color);
+        }
+
+        .details-list::-webkit-scrollbar-thumb:hover {
+            background-color: #a8a8a8;
         }
 
         .details-list li {
             background-color: var(--bg-color);
-            padding: 0.75rem 1rem;
+            padding: 1rem; /* 增加列表项的内边距 */
             border-radius: 6px;
             margin-bottom: 0.5rem;
             display: flex;
@@ -310,6 +367,126 @@
             font-weight: 700;
             color: var(--primary-hover);
             line-height: 1.5;
+        }
+
+        .details-list li > div:first-child {
+            flex-grow: 1;
+        }
+
+        .detail-item-layout {
+            display: flex;
+            gap: 2rem; /* 增加左右间距 */
+            width: 100%;
+            align-items: center; /* 改为 center 实现垂直居中对齐 */
+        }
+
+        .detail-images-container {
+            /* flex: 0 0 320px; */ /* 移除固定宽度 */
+            display: grid; /* 使用网格布局 */
+            grid-template-columns: repeat(4, 1fr); /* 4列 */
+            gap: 0.75rem; /* 网格间距 */
+            align-items: start;
+        }
+
+        .detail-single-image-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .detail-image-label {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: #495057;
+        }
+
+        .detail-image, .detail-image-placeholder {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            border-radius: 6px;
+            object-fit: cover;
+            border: 1px solid var(--border-color);
+        }
+        
+        .detail-image-placeholder {
+            border-style: dashed;
+            background-color: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #adb5bd;
+            font-size: 0.8rem;
+        }
+
+        .detail-results-container {
+            flex: 1; /* 右侧结果区域占据剩余空间 */
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .detail-prompt-title {
+            font-weight: 700;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+            color: var(--primary-hover);
+        }
+
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        .results-table th, .results-table td {
+            border: 1px solid var(--border-color);
+            padding: 0.6rem;
+            text-align: center; /* 居中显示表格内容 */
+        }
+
+        .results-table th {
+            background-color: var(--bg-color);
+            font-weight: 500;
+        }
+
+        .results-table td {
+            transition: all 0.3s ease;
+        }
+
+        .results-table td.highlight {
+            background-color: var(--primary-color);
+            color: white;
+            font-weight: 700;
+        }
+
+        .results-table td:first-child {
+            font-weight: 500;
+            width: 30%;
+        }
+        
+        .input-area {
+            flex: 0 0 50%; /* 占据左侧50%宽度 */
+            box-sizing: border-box; /* 确保 padding 不会影响宽度计算 */
+            padding-right: 1rem; /* 在右侧增加一些内边距，以免内容太贴近 */
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .llm-qa-answer {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background-color: #fdfdfd;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+        
+        .llm-qa-answer strong {
+            font-weight: 700;
+            display: block;
+            margin-bottom: 0.5rem;
         }
 
         .details-images {
@@ -359,7 +536,7 @@
 
         .feature-map-container {
             flex: 1;
-            min-width: 200px;
+            /* min-width: 200px; */ /* 移除，使其与上传框对齐 */
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -377,16 +554,15 @@
 
         .feature-map-box {
             width: 100%;
-            height: 250px;
-            border: 2px solid var(--border-color);
-            border-radius: 8px;
+            padding-top: 56.25%; /* 16:9 Aspec Ratio, 和上传框一致 */
+            border: 2px dashed var(--border-color); /* 和上传框一致 */
+            border-radius: 8px; /* 和上传框一致 */
             display: flex;
-            flex-direction: column;
             justify-content: center;
             align-items: center;
             position: relative;
             overflow: hidden;
-            background-color: #ffffff;
+            background-color: #fdfdfd; /* 和上传框一致 */
         }
 
         .feature-map-box img {
@@ -401,6 +577,10 @@
         }
 
         .no-feature-prompt {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
             color: #adb5bd;
             font-size: 0.9rem;
             text-align: center;
@@ -414,6 +594,10 @@
             width: 40px;
             height: 40px;
             animation: spin 1s linear infinite;
+            position: absolute; /* 改为绝对定位 */
+            top: 50%; /* 垂直居中 */
+            left: 50%; /* 水平居中 */
+            transform: translate(-50%, -50%); /* 精确居中 */
         }
 
         @keyframes spin {
@@ -425,13 +609,20 @@
             display: none !important;
         }
 
+        /* 移除单张和四张图片的特殊样式 */
+        .single-image-item .detail-images-container {}
+        .single-image-item .detail-image {}
+
+        .four-image-item .detail-images-container {}
+        .four-image-item .detail-image {}
+
     </style>
 </head>
 <body>
 
     <main class="main-container">
         <header>
-            <h1>“肤”见未来 - 白癜风分期AI诊断系统</h1>
+            <h1>“肤”见未来:基于多任务辅助学习和多模态大模型的体表图像皮肤疾病诊断系统</h1>
         </header>
 
         <div class="content-wrapper">
@@ -443,7 +634,7 @@
                         <div class="upload-box" id="upload-box-1" onclick="document.getElementById('file-input-1').click()">
                             <div class="upload-prompt" id="prompt-1">
                                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: #adb5bd;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                                <p>临床皮损照片</p>
+                                <p>临床图像</p>
                                 <span>点击或拖拽上传</span>
                             </div>
                             <img id="preview-1" class="hidden" alt="临床皮损照片预览">
@@ -455,7 +646,7 @@
                         <div class="upload-box" id="upload-box-2" onclick="document.getElementById('file-input-2').click()">
                             <div class="upload-prompt" id="prompt-2">
                                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: #adb5bd;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                                <p>伍德灯照片</p>
+                                <p>伍德灯图像</p>
                                 <span>点击或拖拽上传</span>
                             </div>
                             <img id="preview-2" class="hidden" alt="伍德灯照片预览">
@@ -463,11 +654,15 @@
                         </div>
                     </div>
                 </div>
-                <button class="action-button" id="generate-btn" disabled>请先上传至少一张图片</button>
-                <div class="result-actions hidden" id="result-actions">
-                    <button class="action-button" id="save-btn">保存结果</button>
-                    <button class="action-button" id="clear-btn">清空重置</button>
-                    <div id="save-status"></div>
+                <div class="input-actions" id="input-actions">
+                    <button class="action-button" id="generate-btn" disabled>请先上传至少一张图片</button>
+                    <!-- 保存和清空按钮移动到这里 -->
+                    <button class="action-button hidden" id="save-btn">保存结果</button>
+                    <button class="action-button hidden" id="clear-btn">清空重置</button>
+                </div>
+                <!-- 这个容器仅用于JS状态显示 -->
+                 <div class="result-actions hidden" id="result-actions">
+                     <div id="save-status"></div>
                 </div>
             </section>
             
@@ -482,17 +677,17 @@
                     <div class="feature-maps-section" id="feature-maps-section">
                         <div class="feature-maps-area">
                             <div class="feature-map-container">
-                                <div class="feature-map-label" id="feature-label-1">临床图片特征图</div>
+                                <div class="feature-map-label" id="feature-label-1">临床图像边缘特征增强图</div>
                                 <div class="feature-map-box" id="feature-map-1">
                                     <div class="no-feature-prompt">暂无特征图</div>
-                                    <img id="feature-preview-1" class="hidden" alt="临床图片特征图">
+                                    <img id="feature-preview-1" class="hidden" alt="临床图像边缘特征增强图">
                                 </div>
                             </div>
                             <div class="feature-map-container">
-                                <div class="feature-map-label" id="feature-label-2">伍德灯图片特征图</div>
+                                <div class="feature-map-label" id="feature-label-2">伍德灯图像边缘特征增强图</div>
                                 <div class="feature-map-box" id="feature-map-2">
                                     <div class="no-feature-prompt">暂无特征图</div>
-                                    <img id="feature-preview-2" class="hidden" alt="伍德灯图片特征图">
+                                    <img id="feature-preview-2" class="hidden" alt="伍德灯图像边缘特征增强图">
                                 </div>
                             </div>
                         </div>
@@ -509,14 +704,16 @@
                     </div>
                     
                     <a href="#" id="toggle-details">详情查看</a>
-                    
-                    <div id="details-view" class="hidden">
-                        <h3>模型判断过程</h3>
-                        <ul class="details-list" id="details-list">
-                            </ul>
-                    </div>
                 </div>
             </section>
+        </div>
+
+        <!-- 详情视图移动到这里，并进行结构调整 -->
+        <div id="details-view" class="hidden">
+            <h3>模型判断过程</h3>
+            <ul class="details-list" id="details-list">
+                <!-- 详情内容将由JS动态生成 -->
+            </ul>
         </div>
     </main>
 
@@ -547,6 +744,7 @@
         const featurePreview2 = document.getElementById('feature-preview-2');
         const featureLabel1 = document.getElementById('feature-label-1');
         const featureLabel2 = document.getElementById('feature-label-2');
+        const inputActions = document.getElementById('input-actions'); // 获取新的容器
         const resultActions = document.getElementById('result-actions');
         const saveBtn = document.getElementById('save-btn');
         const clearBtn = document.getElementById('clear-btn');
@@ -563,6 +761,7 @@
         toggleDetailsBtn.addEventListener('click', toggleDetails); // 当toggleDetailsBtn被点击时，调用toggleDetails函数
         saveBtn.addEventListener('click', handleSaveResult);
         clearBtn.addEventListener('click', handleClear);
+        // 保存和清空按钮的监听器将由JS动态添加
 
         // --- 功能函数 ---
         
@@ -587,9 +786,9 @@
                 
                 // 显示对应的图片类型标签
                 if (boxNumber === 1) {
-                    typeLabel.textContent = '临床皮损照片';
+                    typeLabel.textContent = '临床图像';
                 } else {
-                    typeLabel.textContent = '伍德灯照片';
+                    typeLabel.textContent = '伍德灯图像';
                 }
                 typeLabel.style.color = '#007BFF';
                 typeLabel.style.fontWeight = '500';
@@ -627,6 +826,8 @@
             loader.classList.remove('hidden'); // 显示加载动画，转圈圈
             resultPlaceholder.classList.add('hidden'); // 隐藏请上传两张图片
             resultContainer.classList.add('hidden'); // 隐藏旧结果
+            saveBtn.classList.add('hidden');
+            clearBtn.classList.add('hidden');
             resultActions.classList.add('hidden'); // 隐藏保存/清空按钮
             detailsView.classList.add('hidden'); // 每次生成都默认折叠详情
             toggleDetailsBtn.textContent = '详情查看'; // 每次生成都默认折叠详情
@@ -666,6 +867,12 @@
                         请检查网络连接或稍后重试
                     </p>
                 `;
+                saveStatus.textContent = `预测失败: ${error.error || error.message || '网络连接错误'}`;
+                saveStatus.style.color = 'var(--danger-color)';
+                saveBtn.disabled = false;
+                saveBtn.textContent = '保存结果';
+                clearBtn.disabled = false;
+                clearBtn.textContent = '清空重置';
             });
         }
 
@@ -675,11 +882,12 @@
             loader.classList.add('hidden'); // 隐藏加载动画
             resultContainer.classList.remove('hidden'); // 显示结果
             resultActions.classList.remove('hidden'); // 显示操作按钮
+            saveBtn.classList.remove('hidden');
+            clearBtn.classList.remove('hidden');
             saveStatus.textContent = ''; // 清空保存状态
             saveBtn.disabled = false;
             saveBtn.textContent = '保存结果';
-
-
+            
             // 检查是否只有一张图片，显示相应警告
             const hasBothImages = file1 && file2;
             if (!hasBothImages) {
@@ -739,63 +947,102 @@
             detailsToRender.forEach(item => {
                 const li = document.createElement('li');
                 
-                // 基本的文本内容 - 处理换行符
-                const formattedAnswer = item.answer.replace(/\n/g, '<br>');
-                const textContent = `<span class="prompt">${item.prompt}</span> <span class="answer">${formattedAnswer}</span>`;
-                
-                // 根据prompt内容决定显示哪些图片
-                let imagesHtml = '';
-                const prompt = item.prompt.toLowerCase();
-                
-                // 检查是否需要显示图片
-                if (prompt.includes('双图') || prompt.includes('两图')) {
-                    // 显示两张图片
-                    imagesHtml = '<div class="details-images">';
-                    if (preview1.src && !preview1.classList.contains('hidden')) {
-                        imagesHtml += `
-                            <div class="details-image-container">
-                                <img src="${preview1.src}" alt="临床照片" class="details-image">
-                                <!-- <div class="details-image-label">临床照片</div> -->
-                            </div>
-                        `;
-                    }
-                    if (preview2.src && !preview2.classList.contains('hidden')) {
-                        imagesHtml += `
-                            <div class="details-image-container">
-                                <img src="${preview2.src}" alt="伍德灯照片" class="details-image">
-                                <!-- <div class="details-image-label">伍德灯照片</div> -->
-                            </div>
-                        `;
-                    }
-                    imagesHtml += '</div>';
-                } else if (prompt.includes('伍德灯') || prompt.includes('woods')) {
-                    // 仅显示伍德灯图片
-                    if (preview2.src && !preview2.classList.contains('hidden')) {
-                        imagesHtml = `
-                            <div class="details-images">
-                                <div class="details-image-container">
-                                    <img src="${preview2.src}" alt="伍德灯照片" class="details-image">
-                                    <!-- <div class="details-image-label">伍德灯照片</div> -->
-                                </div>
-                            </div>
-                        `;
-                    }
-                } else if (prompt.includes('临床') || prompt.includes('clinical')) {
-                    // 仅显示临床图片
-                    if (preview1.src && !preview1.classList.contains('hidden')) {
-                        imagesHtml = `
-                            <div class="details-images">
-                                <div class="details-image-container">
-                                    <img src="${preview1.src}" alt="临床照片" class="details-image">
-                                    <!-- <div class="details-image-label">临床照片</div> -->
-                                </div>
-                            </div>
-                        `;
-                    }
+                // 准备图片和标签数据，固定为4个槽位
+                const images = item.images || [];
+                const labels = item.image_labels || [];
+                let imageSlots = [];
+                for (let i = 0; i < 4; i++) {
+                    imageSlots.push({
+                        src: images[i] || null,
+                        label: labels[i] || null,
+                    });
                 }
                 
-                // 组合内容
-                li.innerHTML = textContent + imagesHtml;
+                // 左侧图片区 - 始终生成4个槽位
+                let imagesHtml = '';
+                imageSlots.forEach(slot => {
+                    if (slot.src) {
+                        imagesHtml += `
+                            <div class="detail-single-image-wrapper">
+                                <div class="detail-image-label">&nbsp;</div>
+                                <img src="/${slot.src}" alt="${slot.label || '分析图片'}" class="detail-image">
+                            </div>
+                        `;
+                    } else {
+                        // 如果没有图片，则显示占位符
+                        imagesHtml += `
+                            <div class="detail-single-image-wrapper">
+                                <div class="detail-image-label">&nbsp;</div>
+                                <div class="detail-image-placeholder">&nbsp;</div>
+                            </div>
+                        `;
+                    }
+                });
+
+                // 右侧结果区
+                // 检查LLM模型结果是否一致
+                const llmClassPrediction = parseFloat(item.llm_class_stable_prob) > parseFloat(item.llm_class_active_prob) ? 'stable' : 'active';
+                const llmQaPrediction = parseFloat(item.llm_qa_stable_prob) > parseFloat(item.llm_qa_active_prob) ? 'stable' : 'active';
+                const llmResultsConsistent = llmClassPrediction === llmQaPrediction;
+
+                // 为每个模型结果生成带高亮的单元格
+                const traditionalStableProb = parseFloat(item.traditional_stable_prob);
+                const traditionalActiveProb = parseFloat(item.traditional_active_prob);
+                const traditionalStableTd = `<td class="${traditionalStableProb > traditionalActiveProb ? 'highlight' : ''}">${item.traditional_stable_prob}</td>`;
+                const traditionalActiveTd = `<td class="${traditionalActiveProb > traditionalStableProb ? 'highlight' : ''}">${item.traditional_active_prob}</td>`;
+
+                const llmClassStableProb = parseFloat(item.llm_class_stable_prob);
+                const llmClassActiveProb = parseFloat(item.llm_class_active_prob);
+                const llmClassStableTd = `<td class="${llmResultsConsistent && llmClassStableProb > llmClassActiveProb ? 'highlight' : ''}">${llmResultsConsistent ? item.llm_class_stable_prob : '——'}</td>`;
+                const llmClassActiveTd = `<td class="${llmResultsConsistent && llmClassActiveProb > llmClassStableProb ? 'highlight' : ''}">${llmResultsConsistent ? item.llm_class_active_prob : '——'}</td>`;
+                
+                const llmQaStableProb = parseFloat(item.llm_qa_stable_prob);
+                const llmQaActiveProb = parseFloat(item.llm_qa_active_prob);
+                const llmQaStableTd = `<td class="${llmResultsConsistent && llmQaStableProb > llmQaActiveProb ? 'highlight' : ''}">${llmResultsConsistent ? item.llm_qa_stable_prob : '——'}</td>`;
+                const llmQaActiveTd = `<td class="${llmResultsConsistent && llmQaActiveProb > llmQaStableProb ? 'highlight' : ''}">${llmResultsConsistent ? item.llm_qa_active_prob : '——'}</td>`;
+
+
+                let resultsHtml = `
+                    <div class="detail-results-container">
+                        <table class="results-table">
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th>稳定期概率</th>
+                                    <th>进展期概率</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>小模型图像分类</td>
+                                    ${traditionalStableTd}
+                                    ${traditionalActiveTd}
+                                </tr>
+                                <tr>
+                                    <td>多模态大模型分类</td>
+                                    ${llmClassStableTd}
+                                    ${llmClassActiveTd}
+                                </tr>
+                                <tr>
+                                    <td>多模态大模型选择</td>
+                                    ${llmQaStableTd}
+                                    ${llmQaActiveTd}
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+
+                // 组合成最终的列表项内容
+                li.innerHTML = `
+                    <div class="detail-item-layout">
+                        <div class="input-area">
+                            <div style="font-weight: 500; font-size: 0.9rem;">输入方式:</div>
+                            <div class="detail-images-container">${imagesHtml}</div>
+                        </div>
+                        ${resultsHtml}
+                    </div>
+                `;
                 detailsList.appendChild(li);
             });
         }
@@ -931,6 +1178,8 @@
             // 隐藏结果，显示占位符
             resultContainer.classList.add('hidden');
             resultActions.classList.add('hidden');
+            saveBtn.classList.add('hidden');
+            clearBtn.classList.add('hidden');
             resultPlaceholder.classList.remove('hidden');
             resultPlaceholder.innerHTML = '<p>上传图片后，点击“生成结果”进行分析</p>';
 
@@ -947,6 +1196,26 @@
             detailsView.classList.add('hidden');
             toggleDetailsBtn.textContent = '详情查看';
         }
+
+        // 动态添加保存和清空按钮的监听器
+        document.addEventListener('DOMContentLoaded', function() {
+            const saveBtn = document.getElementById('save-btn');
+            const clearBtn = document.getElementById('clear-btn');
+            const saveStatusContainer = document.getElementById('save-status-container');
+            const saveStatus = document.getElementById('save-status');
+
+            saveBtn.addEventListener('click', handleSaveResult);
+            clearBtn.addEventListener('click', handleClear);
+
+            // 初始化时，如果已经有结果，则显示保存/清空按钮
+            if (currentPredictionData && currentPredictionData.temp_dir_name) {
+                saveStatusContainer.classList.remove('hidden');
+                saveBtn.disabled = false;
+                saveBtn.textContent = '保存结果';
+                clearBtn.disabled = false;
+                clearBtn.textContent = '清空重置';
+            }
+        });
     </script>
 
 </body>

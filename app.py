@@ -21,6 +21,11 @@ from data_generate.generate_datasets_stage_2_choice import two_choice
 import shutil
 import subprocess
 
+# 导入模型相关模块
+sys.path.append(os.path.join(os.path.dirname(__file__), 'model'))
+from model.test import InferenceSystem, save_results
+from transformers import AutoProcessor
+
 app = Flask(__name__)  #flask相当于盖房子的图纸,app是图纸的实例,之后的所有代码都是基于这个实例的，比如注册网址，配置参数等
 CORS(app)  # 允许跨域请求，允许和来自不同地方的前端页面进行通信，比如前端页面在localhost:3000，后端在localhost:8080，前端页面可以访问后端
 
@@ -38,6 +43,7 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 限制文件大小为16MB
 
 # 全局变量存储模型
 model = None
+inference_system = None
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # 图像预处理
@@ -61,173 +67,407 @@ def cv2_to_base64(img_array, img_format='PNG'):
 
 def load_model():
     """加载训练好的PyTorch模型"""
-    global model
+    global model, inference_system
     try:
-        # 这里需要替换为你的模型路径和模型架构
-        # 示例：假设你的模型是一个简单的分类器
-        model_path = 'model/best_model.pth'  # 请替换为你的模型路径
+        print("正在初始化推理系统...")
         
-        # 如果你有自定义的模型架构，请在这里定义
-        # 这里我用一个示例模型架构，你需要根据你的实际模型修改
-        from torchvision.models import resnet50
-        model = resnet50(pretrained=False)
-        model.fc = nn.Linear(model.fc.in_features, 2)  # 2分类：稳定期/进展期
+        # 初始化推理系统
+        inference_system = InferenceSystem(device)
+        inference_system.initialize()
         
-        # 加载模型权重
-        if os.path.exists(model_path):
-            model.load_state_dict(torch.load(model_path, map_location=device))
-            model.to(device)
-            model.eval()
-            print(f"模型加载成功: {model_path}")
-        else:
-            print(f"警告: 模型文件不存在 {model_path}，将使用模拟数据")
-            model = None
+        # 标记模型已加载成功
+        model = "loaded"  # 用作标记，表示模型系统已初始化
+        print("推理系统初始化成功！")
             
     except Exception as e:
-        print(f"模型加载失败: {e}，将使用模拟数据")
+        print(f"推理系统初始化失败: {e}，将使用模拟数据")
         model = None
+        inference_system = None
 
-def preprocess_image(image_file):
-    """预处理图像"""
-    try:
-        image = Image.open(io.BytesIO(image_file.read())).convert('RGB')
-        image_tensor = transform(image).unsqueeze(0)  # 添加batch维度
-        return image_tensor.to(device)
-    except Exception as e:
-        print(f"图像预处理失败: {e}")
-        return None
+
 
 def predict_with_model(clinical_img=None, woods_img=None, clinical_path=None, woods_path=None, temp_path=None, doot_dir=None):
     """使用真实模型进行预测，支持单张或双张图片"""
     if model is None:
         return get_mock_prediction(clinical_path, woods_path, temp_path, doot_dir)
-    
-    try:
-        with torch.no_grad():
-            # 预处理图片（支持None输入）
-            clinical_tensor = preprocess_image(clinical_img) if clinical_img else None
-            woods_tensor = preprocess_image(woods_img) if woods_img else None
-            
-            # 检查是否至少有一张有效图片
-            if clinical_tensor is None and woods_tensor is None:
-                return get_mock_prediction(clinical_path, woods_path, temp_path)
-            
-            # 根据可用的图片进行预测
-            if clinical_tensor is not None and woods_tensor is not None:
-                # 两张图片都可用 - 使用组合预测（这里可以根据实际模型调整）
-                # 目前简单使用临床图片，实际部署时可以根据模型架构调整
-                outputs = model(clinical_tensor)
-                image_type = "双图片"
-            elif clinical_tensor is not None:
-                # 只有临床图片
-                outputs = model(clinical_tensor)
-                image_type = "临床图片"
-            else:
-                # 只有伍德灯图片
-                outputs = model(woods_tensor)
-                image_type = "伍德灯图片"
-            
-            # 获取预测概率
-            probabilities = torch.softmax(outputs, dim=1)
-            confidence = torch.max(probabilities).item()
-            predicted_class = torch.argmax(probabilities, dim=1).item()
-            
-            # 转换为结果
-            prediction = "进展期" if predicted_class == 1 else "稳定期"
-            
-            # 根据图片数量调整置信度显示
-            if clinical_tensor is not None and woods_tensor is not None:
-                confidence_percent = f"{confidence * 100:.1f}%"
-            else:
-                # 单张图片时降低显示的置信度，提醒准确性较低
-                adjusted_confidence = confidence * 0.8  # 降低20%作为提醒
-                confidence_percent = f"{adjusted_confidence * 100:.1f}%"
-            
-            # 生成真实特征图并保存到临时目录
+
+
+    else:
+        
+        try:
+
+            print("使用真实模型进行预测...")
+
+            # === 第一步：生成特征图（保持原有功能）===
+
             feature_maps = {}
+
             if temp_path:
+
                 temp_dir_name = os.path.basename(temp_path)
-                # --- 生成并编码特征图 ---
+
+                # 生成并编码特征图
+
                 if clinical_path:
+
                     clinical_features_data = extract_woodlamp_edge_features(clinical_path)
+
                     if clinical_features_data and 'gradient_map' in clinical_features_data:
+
                         gradient_map = clinical_features_data['gradient_map']
-                        # 修正: 将CV_64F转换为CV_8U
-                        gradient_map_normalized = cv2.normalize(gradient_map, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-                        overlay_img = create_overlay_image(clinical_path, gradient_map_normalized, image_type='clinical')
+
+                        gradient_map_normalized = cv2.normalize(gradient_map, None, 0, 255, cv2.NORM_MINMAX,
+                                                                dtype=cv2.CV_8U)
+
+                        overlay_img = create_overlay_image(clinical_path, gradient_map_normalized,
+                                                           image_type='clinical')
+
                         if overlay_img is not None:
-                            feature_filename = "clinical_feature.jpg"
+                            feature_filename = "edge_enhanced_clinical.jpg"
+
                             save_path = os.path.join(temp_path, feature_filename)
+
                             cv2.imwrite(save_path, overlay_img)
+
                             feature_maps["clinical_feature"] = f"uploads/temp/{temp_dir_name}/{feature_filename}"
 
                 if woods_path:
+
                     woods_features_data = extract_woodlamp_edge_features(woods_path)
+
                     if woods_features_data and 'gradient_map' in woods_features_data:
+
                         gradient_map = woods_features_data['gradient_map']
-                        # 修正: 将CV_64F转换为CV_8U
-                        gradient_map_normalized = cv2.normalize(gradient_map, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+
+                        gradient_map_normalized = cv2.normalize(gradient_map, None, 0, 255, cv2.NORM_MINMAX,
+                                                                dtype=cv2.CV_8U)
+
                         overlay_img = create_overlay_image(woods_path, gradient_map_normalized, image_type='wood_lamp')
+
                         if overlay_img is not None:
-                            feature_filename = "woods_feature.jpg"
+                            feature_filename = "edge_enhanced_woods.jpg"
+
                             save_path = os.path.join(temp_path, feature_filename)
+
                             cv2.imwrite(save_path, overlay_img)
+
                             feature_maps["woods_feature"] = f"uploads/temp/{temp_dir_name}/{feature_filename}"
-            
+
+            # === 第二步：使用真实模型进行预测 ===
             # === 生成数据集文件 ===
-            try:
-                # 确定预测状态（将中文转换为英文状态标识）
-                status_prediction = "active_stage" if prediction == "进展期" else "stable_stage"
-                
-                # 生成唯一的patient_id
-                patient_id = f"patient_{temp_dir_name}"
-                
-                # 1. 创建临时的master.json文件
-                master_case_data = {
-                    "idx": 0,
-                    "status": status_prediction,
-                    "patient_id": patient_id,
-                    "images": {
-                        "clinical": [os.path.basename(clinical_path)] if clinical_path else [],
-                        "wood_lamp": [os.path.basename(woods_path)] if woods_path else []
+            if temp_path:
+                try:
+                    # 模拟预测状态为进展期
+                    status_prediction = "active_or_stable"
+
+                    # 生成唯一的patient_id
+                    temp_dir_name = os.path.basename(temp_path)
+                    patient_id = f"patient_{temp_dir_name}"
+
+                    # 1. 创建临时的master.json文件
+                    master_case_data = {
+                        "idx": 0,
+                        "status": status_prediction,
+                        "patient_id": patient_id,
+                        "images": {
+                            "clinical": [os.path.basename(clinical_path).split('_')[-1]] if clinical_path else [],
+                            "wood_lamp": [os.path.basename(woods_path).split('_')[-1]] if woods_path else []
+                        }
                     }
+
+                    master_json_path = os.path.join(temp_path, 'master.json')
+                    with open(master_json_path, 'w', encoding='utf-8') as f:
+                        json.dump([master_case_data], f, indent=2, ensure_ascii=False)
+
+                    two_binary_cls(master_json_path, temp_path, doot_dir)
+                    two_choice(master_json_path, temp_path, doot_dir)
+
+                    print(f"模拟预测：成功通过外部脚本在 {temp_path} 生成数据集文件。")
+
+                except Exception as e:
+                    print(f"数据json文件生成出错: {e}")
+
+            # === 第三步：动态创建INPUT_CONFIG ===
+            # 根据生成的JSON文件构建动态配置
+            dynamic_input_config = {
+                "oc": {
+                    "json_path": os.path.join(temp_path, "train_binary_cls_1img_OC.json"),
+                    "image_types": ["clinical"]
+                },
+                "ow": {
+                    "json_path": os.path.join(temp_path, "train_binary_cls_1img_OW.json"),
+                    "image_types": ["wood"]
+                },
+                "oc_ec": {
+                    "json_path": os.path.join(temp_path, "train_binary_cls_2img_OC_EC.json"),
+                    "image_types": ["clinical", "edge_enhanced_clinical"]
+                },
+                "ow_ew": {
+                    "json_path": os.path.join(temp_path, "train_binary_cls_2img_OW_EW.json"),
+                    "image_types": ["wood", "edge_enhanced_wood"]
+                },
+                "oc_ow": {
+                    "json_path": os.path.join(temp_path, "train_binary_cls_2img_OC_OW.json"),
+                    "image_types": ["clinical", "wood"]
+                },
+                "oc_ec_ow_ew": {
+                    "json_path": os.path.join(temp_path, "train_binary_cls_4img_OC_EC_OW_EW.json"),
+                    "image_types": ["clinical", "edge_enhanced_clinical", "wood", "edge_enhanced_wood"]
                 }
-                
-                master_json_path = os.path.join(temp_path, 'master.json')
-                with open(master_json_path, 'w', encoding='utf-8') as f:
-                    json.dump([master_case_data], f, indent=2, ensure_ascii=False)
-
-                # 2. 调用外部脚本生成数据集
-                script_path = os.path.join('data_generate', 'generate_datasets_stage_2_binary_cls.py')
-                subprocess.run([
-                    sys.executable, script_path,
-                    '--master_json', master_json_path,
-                    '--output_dir', temp_path
-                ], check=True)
-
-                print(f"成功通过外部脚本在 {temp_path} 生成数据集文件。")
-
-            except Exception as e:
-                print(f"通过外部脚本生成数据集时出错: {e}")
-            
-            # 生成详细分析过程
-            details = generate_analysis_details(clinical_tensor, woods_tensor, probabilities, image_type)
-            
-            result = {
-                "final_prediction": prediction,
-                "confidence": confidence_percent,
-                "details": details
             }
             
-            # 添加特征图（如果生成成功）
-            if feature_maps:
-                result["feature_maps"] = feature_maps
+            # 过滤掉不存在的JSON文件
+            available_config = {}
+            for input_type, config in dynamic_input_config.items():
+                if os.path.exists(config["json_path"]):
+                    available_config[input_type] = config
+                else:
+                    print(f"警告: JSON文件不存在: {config['json_path']}")
             
-            return result
+            if not available_config:
+                print("错误: 没有可用的JSON文件，回退到模拟预测")
+                return get_mock_prediction(clinical_path, woods_path, temp_path, doot_dir)
+
+            # === 第四步：加载预处理后的图像 ===
+            try:
+                # 加载数据，使用temp_path作为图像根目录
+                ordered_ids, test_samples = inference_system.load_data(
+                    input_config=available_config, 
+                    image_root_dir=temp_path
+                )
+                print(f"加载了 {len(ordered_ids)} 个样本ID，样本数量: {len(test_samples)}")
+                print(f"可用的输入类型: {list(available_config.keys())}")
+            except Exception as e:
+                print(f"数据加载失败: {e}，回退到模拟预测")
+                return get_mock_prediction(clinical_path, woods_path, temp_path, doot_dir)
+
+            # 运行推理
+            try:
+                probabilities_data, predictions_data = inference_system.run_inference(ordered_ids, test_samples)
+                # 保存结果并获取增强的概率数据
+                enhanced_probabilities_data = save_results(probabilities_data, predictions_data)
+                print("测试完成!")
+            except Exception as e:
+                print(f"模型推理失败: {e}，回退到模拟预测")
+                return get_mock_prediction(clinical_path, woods_path, temp_path, doot_dir)
             
-    except Exception as e:
-        print(f"模型预测失败: {e}")
-        return get_mock_prediction(clinical_path, woods_path, temp_path)
+
+
+            # === 第五步：处理预测结果 ===
+            if enhanced_probabilities_data and len(enhanced_probabilities_data) > 0:
+                prob_row = enhanced_probabilities_data[0]
+                pred_row = predictions_data[0]
+                
+                
+                # 生成详细分析
+                details ,final_prediction, confidence= generate_model_analysis_details(prob_row, pred_row, clinical_path, woods_path)
+                
+                # 构建最终结果
+                result = {
+                    "final_prediction": final_prediction,
+                    "confidence": f"{int(confidence * 100)}",
+                    "feature_maps": feature_maps,
+                    "details": details,
+                    "model_type": "real_model"  # 标记使用了真实模型
+                }
+                
+                print(f"真实模型预测完成：{final_prediction}，置信度：{confidence:.1%}")
+                return result
+            else:
+                print("警告：模型推理失败，回退到模拟预测")
+                return get_mock_prediction(clinical_path, woods_path, temp_path, doot_dir)
+
+
+
+        except Exception as e:
+            print(f"真实模型预测失败: {e}，回退到模拟预测")
+            return get_mock_prediction(clinical_path, woods_path, temp_path, doot_dir)
+
+
+def determine_model_prediction(prob_row, pred_row=None, clinical_path=None, woods_path=None):
+    """
+    根据 CSV 文件最后两列直接确定最终预测结果
+    result: 0 表示稳定期，1 表示进展期
+    confidence: 置信度
+    """
+    # 读取结果和置信度
+    result_flag = int(prob_row["result"])
+    confidence = float(prob_row["confidence"])
+
+    # 0 -> 稳定期, 1 -> 进展期
+    prediction = "进展期" if result_flag == 1 else "稳定期"
+
+    return prediction, int(confidence * 100)
+
+
+def generate_model_analysis_details(prob_row, pred_row, clinical_path=None, woods_path=None):
+    """生成模型分析详情 - 根据CSV数据动态显示图片组合和预测概率"""
+    details = []
+
+    # 全局概率收集
+    global_probs = {
+        "稳定期": [],
+        "进展期": []
+    }
+
+    # 获取图片基础路径信息
+    temp_dir_name = None
+    if clinical_path or woods_path:
+        # 从路径中提取临时目录名
+        path_to_check = clinical_path or woods_path
+        temp_dir_name = os.path.basename(os.path.dirname(path_to_check))
+
+    # 列名到图片组合的映射
+    combination_mapping = {
+        "oc": {
+            "name": "原始临床图",
+            "description": "仅原始临床图像分析",
+            "images": ["original_clinical"],
+            "image_labels": ["原始临床图片"]
+        },
+        "ow": {
+            "name": "原始伍德灯图",
+            "description": "仅原始伍德灯图像分析",
+            "images": ["original_woods"],
+            "image_labels": ["原始伍德灯图片"]
+        },
+        "oc_ec": {
+            "name": "原始临床图，边缘增强临床图",
+            "description": "临床图像+边缘增强分析",
+            "images": ["original_clinical", "edge_enhanced_clinical"],
+            "image_labels": ["原始临床图片", "边缘增强临床图片"]
+        },
+        "ow_ew": {
+            "name": "原始伍德灯图，边缘增强伍德灯图",
+            "description": "伍德灯+边缘增强分析",
+            "images": ["original_woods", "edge_enhanced_woods"],
+            "image_labels": ["原始伍德灯图片", "边缘增强伍德灯图片"]
+        },
+        "oc_ow": {
+            "name": "原始临床图，原始伍德灯图",
+            "description": "临床+伍德灯双图融合分析",
+            "images": ["original_clinical", "original_woods"],
+            "image_labels": ["原始临床图片", "原始伍德灯图片"]
+        },
+        "oc_ec_ow_ew": {
+            "name": "原始临床图，边缘增强临床图，原始伍德灯图，边缘增强伍德灯图",
+            "description": "四图融合综合分析",
+            "images": ["original_clinical", "edge_enhanced_clinical", "original_woods", "edge_enhanced_woods"],
+            "image_labels": ["原始临床图片", "边缘增强临床图片", "原始伍德灯图片", "边缘增强伍德灯图片"]
+        }
+    }
+
+    # 获取所有可用的预测组合
+    available_combinations = []
+    for key in prob_row.keys():
+        if key != "id" and "_stable" in key:
+            input_type = key.replace("_stable", "")
+            if f"{input_type}_active" in prob_row:
+                available_combinations.append(input_type)
+
+    # 为每种组合生成详情显示
+    for input_type in available_combinations:
+        if input_type in combination_mapping:
+            stable_prob = prob_row[f"{input_type}_stable"]
+            active_prob = prob_row[f"{input_type}_active"]
+            prediction = "进展期" if active_prob > stable_prob else "稳定期"
+
+            combo_info = combination_mapping[input_type]
+
+            # 构建图片路径信息
+            image_paths = []
+            if temp_dir_name:
+                for img_name in combo_info["images"]:
+                    # 根据图片类型构建完整路径
+                    if img_name == "original_clinical":
+                        # 查找临床图片
+                        if clinical_path:
+                            image_paths.append(f"uploads/temp/{temp_dir_name}/{os.path.basename(clinical_path)}")
+                            # image_paths.append(clinical_path)
+                    elif img_name == "original_woods":
+                        # 查找伍德灯图片
+                        if woods_path:
+                            image_paths.append(f"uploads/temp/{temp_dir_name}/{os.path.basename(woods_path)}")
+                            # image_paths.append(woods_path)
+                    elif img_name == "edge_enhanced_clinical":
+                        image_paths.append(f"uploads/temp/{temp_dir_name}/edge_enhanced_clinical.jpg")
+                    elif img_name == "edge_enhanced_woods":
+                        # image_paths.append(f"/uploads/temp/{temp_dir_name}/edge_enhanced_woods.jpg")
+                        image_paths.append(f"uploads/temp/{temp_dir_name}/edge_enhanced_woods.jpg")
+
+            # 模拟LLM结果
+            llm_prediction = prediction  # 模拟LLM分类结果
+            # 制造一点点不同来区分
+            llm_stable_prob = min(stable_prob + random.uniform(-0.3, -0.1), 1.0)
+            llm_active_prob = 1 - llm_stable_prob
+            llm_stable_probb = min(stable_prob + random.uniform(-0.2, -0.1), 1.0)
+            llm_active_probb = 1 - llm_stable_probb
+            llm_qa_answer = f"这是一个模拟的AI问答摘要。综合分析图像特征，AI认为当前情况与“{prediction}”的典型表现较为一致。请注意这仅为模拟数据。"
+
+            # === 收集全局概率 ===
+            # 传统模型概率
+            global_probs["稳定期"].append(stable_prob)
+            global_probs["进展期"].append(active_prob)
+            # 大模型分类与问答一致才加
+            llm_prediction = "进展期" if llm_active_prob > llm_stable_prob else "稳定期"
+            llm_qa_prediction = "进展期" if llm_active_probb > llm_stable_probb else "稳定期"
+
+            if llm_prediction == llm_qa_prediction:
+                global_probs["稳定期"].append(llm_stable_prob)
+                global_probs["进展期"].append(llm_active_prob)
+                global_probs["稳定期"].append(llm_stable_probb)
+                global_probs["进展期"].append(llm_active_probb)
+
+            # 构建详情信息
+            detail_info = {
+                "prompt": combo_info["name"],
+                "description": combo_info["description"],
+                "images": image_paths,
+                "image_labels": combo_info["image_labels"],
+
+                # 传统模型结果
+                "traditional_prediction": prediction,
+                "traditional_stable_prob": f"{stable_prob:.4f}",
+                "traditional_active_prob": f"{active_prob:.4f}",
+
+                # 模拟的大模型分类结果
+                "llm_class_prediction": llm_prediction,
+                "llm_class_stable_prob": f"{llm_stable_prob:.4f}",
+                "llm_class_active_prob": f"{llm_active_prob:.4f}",
+
+                # 模拟的大模型问答结果
+                "llm_qa_answer": prediction,
+                "llm_qa_stable_prob": f"{llm_stable_probb:.4f}",
+                "llm_qa_active_prob": f"{llm_active_probb:.4f}",
+
+            }
+
+            details.append(detail_info)
+    # 计算全局 prediction & confidence
+    avg_stable = sum(global_probs["稳定期"]) / len(global_probs["稳定期"]) if global_probs["稳定期"] else 0.0
+    avg_active = sum(global_probs["进展期"]) / len(global_probs["进展期"]) if global_probs["进展期"] else 0.0
+
+    if avg_stable > avg_active:
+        final_prediction = "稳定期"
+        final_confidence = avg_stable
+    else:
+        final_prediction = "进展期"
+        final_confidence = avg_active
+    # 根据上传的图片数量调整置信度分数
+    num_images = 0
+    if clinical_path:
+        num_images += 1
+    if woods_path:
+        num_images += 1
+
+    if num_images == 1:
+        final_confidence *= 50
+    elif num_images == 2:
+        final_confidence *= 100
+
+    return details, final_prediction, final_confidence
+    
+    
 
 def generate_analysis_details(clinical_tensor, woods_tensor, probabilities, image_type):
     """根据可用图片类型生成分析详情"""
@@ -348,7 +588,7 @@ def get_mock_prediction(clinical_path=None, woods_path=None, temp_path=None, doo
     # 完整结果
     result = {
         "final_prediction": "进展期",
-        "confidence": "99.5%",
+        "confidence": 99,
         "feature_maps": feature_maps,
         "details": [
             {"prompt": "双图prompt_1", "answer": "llm问答：进展期\nllm分类：进展期\ncnn分类：进展期"},
@@ -570,7 +810,7 @@ if __name__ == '__main__':
     print(f"使用设备: {device}")
     
     # 加载模型
-    load_model()
+    # load_model()
     
     # 启动服务
     print("服务启动中...")
